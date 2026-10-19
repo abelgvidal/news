@@ -40,12 +40,14 @@
   .side h2 { font-size:1.28rem; }
   .row3 h2 { font-size:1.2rem; }
   .row4 h2 { font-size:1.2rem; }
-  .story p.summary { margin:0 0 8px; color:var(--fg); }
-  .lead p.summary { font-size:1.12rem; }
-  .side p.summary, .row3 p.summary { font-size:0.95rem; }
-  .row4 p.summary { font-size:0.95rem; }
+  .story .summary { margin:0 0 8px; color:var(--fg); }
+  .lead .summary { font-size:1.12rem; }
+  .side .summary, .row3 .summary { font-size:0.95rem; }
+  .row4 .summary { font-size:0.95rem; }
   .story img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; margin-bottom:10px; background:var(--hair); }
   .lead img { aspect-ratio:3/2; }
+  ul.lines { padding-left:1.05em; }
+  ul.lines li { margin:0 0 3px; padding-left:.1em; }
   .outlets { margin:0; font: 0.8rem/1.4 system-ui, sans-serif; color:var(--muted); }
   .outlets b { color:var(--fg); font-weight:600; }
   .empty { color:var(--muted); font-family:system-ui, sans-serif; }
@@ -81,7 +83,9 @@
     {% if img and s.image_url %}<img src="{{ s.image_url }}" alt="" loading="lazy">{% endif %}
     {% if kicker %}<div class="kicker">{{ s.outlets }} medios · {{ hora(s.updated_at) }}</div>{% endif %}
     <h2>{{ s.headline }}</h2>
-    {% if s.summary %}<p class="summary">{{ s.summary }}</p>{% endif %}
+    {% if s.summary %}{% set lines = s.summary.split("\n") %}
+    {% if lines | length > 1 %}<ul class="summary lines">{% for ln in lines %}<li>{{ ln }}</li>{% endfor %}</ul>
+    {% else %}<p class="summary">{{ s.summary }}</p>{% endif %}{% endif %}
     <p class="outlets"><b>Cubierto por</b> {{ s.outlet_names | join(", ") }}</p>
   </article>
 {% endmacro %}
