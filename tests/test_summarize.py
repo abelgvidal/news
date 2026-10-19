@@ -8,7 +8,8 @@ import pytest
 from agregador import db
 from agregador.render import Story
 from agregador.summarize import (
-    SUMMARY_MODEL, build_prompt, needs_refresh, parse_response, select_sources, summarize_stories,
+    SUMMARY_MODEL, build_prompt, check_headline, needs_refresh, parse_response, select_sources,
+    summarize_stories, summarize_story,
 )
 
 NOW = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
@@ -21,8 +22,9 @@ def story(cid=1, n=3):
 
 
 class FakeClient:
-    def __init__(self, payload=None, fail=False):
-        self.calls, self.payload, self.fail = 0, payload or {"headline": "H", "summary": "S"}, fail
+    def __init__(self, payload=None, fail=False, payloads=None):
+        self.calls, self.fail = 0, fail
+        self.payloads = payloads or [payload or {"headline": "H", "summary": "S"}]
         self.messages = self
 
     def create(self, **kwargs):
@@ -30,7 +32,8 @@ class FakeClient:
         self.kwargs = kwargs
         if self.fail:
             raise RuntimeError("boom")
-        block = SimpleNamespace(type="text", text=json.dumps(self.payload))
+        payload = self.payloads[min(self.calls - 1, len(self.payloads) - 1)]
+        block = SimpleNamespace(type="text", text=json.dumps(payload))
         return SimpleNamespace(stop_reason="end_turn", content=[block])
 
 
@@ -98,3 +101,46 @@ def test_select_sources_gives_every_outlet_a_slot_before_repeats():
 def test_select_sources_keeps_everything_when_under_the_limit():
     srcs = [{"name": "A", "title": "a1"}, {"name": "B", "title": "b1"}]
     assert select_sources(srcs) == srcs
+
+
+@pytest.mark.parametrize("headline", [
+    "Trump se declara dispuesto a reunirse con Putin",
+    "Vox estudia no presentarse al Senado",
+    "Feijóo: «No voy a fallar»",
+    'El ministro dice que bajará los impuestos',
+    "¿Qué pasa con la dana?",
+    "x" * 91,
+])
+def test_check_headline_flags_statements_speculation_quotes_and_length(headline):
+    assert check_headline(headline)
+
+
+@pytest.mark.parametrize("headline", [
+    "Francia impone toques de queda parciales en París y otras ciudades",
+    "Trump propone una cumbre con Putin y Xi en noviembre",
+    "El Gobierno declara el estado de emergencia en tres regiones",  # 'declara' is a legal act, not a statement
+    "Casación confirma el archivo de la causa contra Macri",
+])
+def test_check_headline_accepts_factual_headlines(headline):
+    assert check_headline(headline) == []
+
+
+def test_bad_headline_triggers_one_retry_that_names_the_broken_rule():
+    client = FakeClient(payloads=[{"headline": "Trump se declara dispuesto", "summary": "S1"},
+                                  {"headline": "Trump propone una cumbre", "summary": "S2"}])
+    assert summarize_story(client, story()) == ("Trump propone una cumbre", "S2")
+    assert client.calls == 2
+    assert "se declara" in client.kwargs["messages"][0]["content"]
+
+
+def test_good_headline_costs_a_single_call():
+    client = FakeClient(payload={"headline": "Casación confirma el archivo", "summary": "S"})
+    summarize_story(client, story())
+    assert client.calls == 1
+
+
+def test_still_bad_after_retry_is_kept_not_retried_forever():
+    bad = {"headline": "El presidente dice que dimitirá", "summary": "S"}
+    client = FakeClient(payloads=[bad, bad])
+    assert summarize_story(client, story())[0] == bad["headline"]
+    assert client.calls == 2
