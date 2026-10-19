@@ -1,0 +1,11 @@
+[Unit]
+Description=Agregador: fetch, cluster and render the front page
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/agregador
+ExecStart=/usr/bin/flock -n /run/agregador.lock /opt/agregador/.venv/bin/agregador run --out /var/www/agregador
+User=agregador
+Environment=HF_HOME=/opt/agregador/.cache/huggingface
+Nice=10

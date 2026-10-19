@@ -1,0 +1,43 @@
+[project]
+name = "agregador"
+version = "0.1.0"
+description = "Spanish news aggregator with story clustering"
+requires-python = ">=3.12"
+dependencies = [
+    "feedparser>=6.0",
+    "httpx>=0.27",
+    "jinja2>=3.1",
+    "anthropic>=1.0",
+    "tzdata",
+]
+
+[project.optional-dependencies]
+ml = [
+    "numpy",
+    "torch",
+    "sentence-transformers",
+]
+
+[dependency-groups]
+dev = ["pytest"]
+
+[project.scripts]
+agregador = "agregador.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agregador"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

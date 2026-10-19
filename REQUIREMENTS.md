@@ -1,0 +1,124 @@
+# Agregador: Requirements
+
+A Spanish-language news aggregator. It collects articles from the RSS feeds of popular Spanish media, groups articles about the same story into clusters, and publishes a front page of those clusters.
+
+## 1. Scope
+
+- **Language**: Spanish. Multiple **countries** are supported as separate tabs (España, Argentina); each country is clustered on its own with its own feeds, and pages are written in Spanish. Cross-language clustering is out of scope (tested on 2026-10-19: correct cross-lingual matches score 0.88-0.91 vs false ones 0.86-0.87, too close for a fixed threshold).
+- **Content**: RSS data only (title, summary, link, publication date, image if present). No full-article fetching in v1.
+- **Audience**: personal use first, public product later. Design choices must not block going public.
+- **Hosting**: one Linux box on Hetzner (e.g. 2 vCPU / 4 GB). No GPU.
+- **Budget**: no paid APIs in the hot path.
+
+## 2. Functional requirements
+
+### 2.1 Ingestion
+- FR-1. Fetch every configured feed every 15 minutes.
+- FR-2. Use conditional GET (ETag / If-Modified-Since), a descriptive User-Agent, and a per-feed timeout.
+- FR-3. A failing, slow or malformed feed must not abort the run. Log the failure and continue.
+- FR-4. Back off on feeds that fail repeatedly. Track per-feed health (last success, consecutive failures).
+- FR-5. Feeds are defined in a config file (name, URL, optional weight). Adding a feed is a config change only.
+- FR-6. Deduplicate articles by normalized URL (strip tracking params, resolve redirects where cheap) and by feed GUID.
+- FR-7. Strip HTML from summaries and normalize whitespace and encoding.
+- FR-8. Retain articles for 30 days, then purge.
+
+### 2.2 Clustering
+- FR-9. Embed `title + summary` with a local multilingual model. Chosen: `intfloat/multilingual-e5-small` (with the `query: ` prefix), which beat `paraphrase-multilingual-MiniLM-L12-v2` on the labeled pair set (F0.5 0.93 vs 0.83).
+- FR-10. Clustering is incremental. A new article is compared with the centroids of clusters active in the last 48 h by cosine similarity. At or above the threshold it joins the best cluster and the centroid is updated. Below it, a new cluster starts.
+- FR-11. The threshold is tuned on a labeled set of article pairs (same story / different story), not by gut: `tests/labeled_pairs.csv` (205 pairs; `scripts/tune.py`). Current threshold for e5-small: 0.90. e5 scores are compressed (unrelated texts reach ~0.88), so thresholds are not comparable across models.
+- FR-12. Guards against false merges:
+  - require some overlap of named entities or rare tokens;
+  - two articles from the same outlet merge only above a higher similarity threshold.
+- FR-13. Clusters expire from the front page after 48 h without new articles.
+- FR-14. The cluster headline is the member title closest to the centroid. The cluster image is the first available member image.
+
+### 2.3 Front page
+- FR-14b. Product shape: the page shows only the **10 most covered stories** (distinct outlets, recency-boosted), each with an **own-words summary** and the **names of the covering outlets**, with **no links to the outlets**. Single-outlet stories are not shown.
+- FR-14c. Summaries are written by `claude-haiku-5-5` from titles and RSS snippets only (neutral, facts present in the sources, disagreements stated, no verbatim copying; source text treated as data). A summary is regenerated only when its cluster grows by >= 3 articles and >= 30 %. If the API fails or has no credentials, the page falls back to the original headline and the run continues. Estimated cost ~2 USD/month.
+- FR-15. Output is static HTML regenerated every 15 minutes after ingestion and clustering.
+- FR-16. Ranking: score = (number of distinct outlets in the cluster) with a recency boost. Newer last-update means a higher score. Singleton clusters rank below multi-outlet ones.
+- FR-17. Each cluster shows: headline, image (if any), time of latest article, and the list of covering outlets with links to the original articles.
+- FR-18. Display headline, short snippet and link only. Do not republish full text.
+- FR-19. The page is responsive and readable without JavaScript.
+- FR-20. The page is written atomically (temp file then rename), so readers never see a half-written page.
+
+## 3. Non-functional requirements
+
+- NFR-1. A full cycle (fetch, embed, cluster, render) finishes in under 5 minutes on the target box.
+- NFR-2. RAM use stays under 2 GB, so a 4 GB box has headroom.
+- NFR-3. Cycles are idempotent. Re-running on the same data changes nothing.
+- NFR-4. Scheduling by cron or a systemd timer. Overlapping runs are prevented (lock file).
+- NFR-5. Structured logs and a per-feed health summary (CLI command or section in the logs).
+- NFR-6. Tests:
+  - feed parsing against recorded fixture feeds;
+  - a clustering regression test on the labeled pair set;
+  - the renderer produces valid HTML.
+- NFR-7. Public-readiness: serve via nginx or Caddy over HTTPS, keep the source list and attribution visible, and respect robots/ToS.
+
+## 3b. Maintainability requirements
+
+- MR-1. **Alerting**: notify (email or webhook) when a feed has been failing for more than N hours, or when a whole run fails or produces no page.
+- MR-2. **Model versioning**: store the embedding model name and version with every embedding. Provide a `reembed` command that rebuilds all vectors and re-clusters after a model change.
+- MR-3. **Clustering explainability**: a CLI command shows, for any article, its cluster, best similarity score, runner-up, and which guards fired.
+- MR-4. **Schema migrations**: numbered SQL migration files applied in order, with the schema version recorded in the DB.
+- MR-5. **Dependency pinning**: a lock file and a documented Python version.
+- MR-6. **Reproducible deploys**: systemd units, cron or timer, and web server config live in the repo, with a short setup procedure for a fresh Hetzner box.
+- MR-7. **Backups**: daily off-box copy of the SQLite file. Config, labeled pairs and fixtures live in git.
+- MR-8. **Modular stages**: `fetch`, `embed`, `cluster` and `render` are separate modules with plain-data interfaces, each testable and replaceable alone.
+- MR-9. **Normalization layer**: all feed-specific quirks (encodings, date formats, tracking params) are handled in one place.
+
+## 4. Stack
+
+Python, with `feedparser` and `httpx` for fetching, `sentence-transformers` for embeddings, `numpy` for similarity, SQLite for storage, Jinja2 for templates, and cron or a systemd timer for scheduling.
+
+## 5. Initial sources
+
+Verified on 2026-10-19 (HTTP 200 with items):
+
+| Outlet | Feed URL |
+|---|---|
+| El País | https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada |
+| El Mundo | https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml |
+| ABC | https://www.abc.es/rss/2.0/portada/ |
+| La Vanguardia | https://www.lavanguardia.com/rss/home.xml |
+| elDiario.es | https://www.eldiario.es/rss/ |
+| 20minutos | https://www.20minutos.es/rss/ |
+| El Confidencial | https://rss.elconfidencial.com/espana/ |
+| Europa Press | https://www.europapress.es/rss/rss.aspx |
+| El Español | https://www.elespanol.com/rss/ |
+| OKDiario | https://okdiario.com/feed |
+| Expansión | https://e00-expansion.uecdn.es/rss/portada.xml |
+| La Voz de Galicia | https://www.lavozdegalicia.es/index.xml |
+
+To fix (the URL tried failed; find the correct feed):
+
+| Outlet | Tried | Result |
+|---|---|---|
+| RTVE | https://www.rtve.es/api/noticias.rss | 404 |
+| La Razón | https://www.larazon.es/rss/portada.xml | 503 |
+| Público | https://www.publico.es/rss | 404 |
+| El Periódico | https://www.elperiodico.com/es/rss/rss_portada.xml | 406 |
+| Cadena SER | https://cadenaser.com/rss/ | 403 |
+
+Some failures may be bot blocking tied to the User-Agent rather than a dead URL. Re-test with the final User-Agent.
+
+Note that feed sizes vary a lot (10 to 205 items). Europa Press and El Confidencial return few items, which affects how much they contribute to clusters.
+
+### Argentina (verified 2026-10-19)
+
+Clarín (4 section feeds), La Nación, Infobae, Página/12, Perfil, Ámbito, TN, El Cronista, Noticias Argentinas. Note: Clarín and TN share an owner. No usable feed found for El Destape, La Voz, Cadena 3, Crónica, La Capital, Los Andes, MDZ.
+
+## 6. Out of scope for v1
+
+- Full-article fetching
+- User accounts and personalization
+- Topic categories or section pages
+- Cross-language clustering
+- LLM-generated summaries (optional later: judge ambiguous pairs in a grey similarity zone, or summarize clusters)
+- Source bias labeling
+
+## 7. Open questions
+
+- Final choice of embedding model, based on speed and quality on the labeled set.
+- Ranking refinements: source weights, and a penalty for outlets that publish many near-duplicate items.
+- Public launch: domain, HTTPS, analytics, and how to credit sources.

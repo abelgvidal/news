@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Sample</title>
+    <item>
+      <title>Titular &amp;aacute; de   prueba</title>
+      <link>https://Example.com/noticia/1?utm_source=rss&amp;id=7</link>
+      <guid>https://example.com/noticia/1</guid>
+      <description>&lt;p&gt;Resumen con &lt;b&gt;HTML&lt;/b&gt;.&lt;/p&gt;</description>
+      <pubDate>Mon, 19 Oct 2026 10:00:00 +0000</pubDate>
+      <media:content url="https://example.com/img.jpg" medium="image"/>
+    </item>
+    <item>
+      <title></title>
+      <link>https://example.com/sin-titulo</link>
+    </item>
+  </channel>
+</rss>
