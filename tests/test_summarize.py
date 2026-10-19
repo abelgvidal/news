@@ -109,6 +109,9 @@ def test_select_sources_keeps_everything_when_under_the_limit():
     "Feijóo: «No voy a fallar»",
     'El ministro dice que bajará los impuestos',
     "¿Qué pasa con la dana?",
+    "Milei destaca en Neuquén el superávit energético",
+    "El Gobierno celebra las exportaciones récord",
+    "La ministra critica al Constitucional",
     "x" * 91,
 ])
 def test_check_headline_flags_statements_speculation_quotes_and_length(headline):
