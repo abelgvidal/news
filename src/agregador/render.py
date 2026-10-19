@@ -5,6 +5,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import numpy as np
@@ -51,6 +52,20 @@ class Story:
     @property
     def outlet_names(self) -> list[str]:
         return sorted({s["name"] for s in self.sources})
+
+    @property
+    def outlet_links(self) -> list[dict]:
+        """One entry per outlet, most representative first, linking to that outlet's article.
+
+        Feed content is untrusted, so only http(s) URLs become links; an outlet without a
+        safe URL is still listed, just not linked.
+        """
+        links: dict[str, str | None] = {}
+        for src in self.sources:  # sources are ordered most representative first
+            url = src["url"] if urlsplit(src["url"]).scheme in ("http", "https") else None
+            if links.get(src["name"]) is None:
+                links[src["name"]] = url
+        return [{"name": name, "url": url} for name, url in links.items()]
 
 
 def score(outlets: int, last_published: datetime, now: datetime) -> float:

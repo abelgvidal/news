@@ -49,6 +49,10 @@
   ul.lines { padding-left:1.05em; }
   ul.lines li { margin:0 0 3px; padding-left:.1em; }
   .outlets { margin:0; font: 0.8rem/1.4 system-ui, sans-serif; color:var(--muted); }
+  .outlets a { color:inherit; text-decoration:underline; text-decoration-color:var(--hair); text-underline-offset:2px; }
+  .outlets a:hover { color:var(--accent); text-decoration-color:currentColor; }
+  details.more { margin-top:3px; }
+  details.more summary { cursor:pointer; color:var(--accent); font-weight:600; }
   .outlets b { color:var(--fg); font-weight:600; }
   .empty { color:var(--muted); font-family:system-ui, sans-serif; }
 
@@ -78,6 +82,10 @@
 {% endif %}
 <div class="dateline"><span>{{ fecha }} · {{ country.name }}</span><span>Lo más citado en los medios · actualizado a las {{ hora(now) }}</span></div>
 
+{% macro outlet(o) -%}
+  {%- if o.url %}<a href="{{ o.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ o.name }}</a>{% else %}{{ o.name }}{% endif -%}
+{%- endmacro %}
+
 {% macro story(s, kicker=true, img=true) %}
   <article class="story">
     {% if img and s.image_url %}<img src="{{ s.image_url }}" alt="" loading="lazy">{% endif %}
@@ -86,7 +94,13 @@
     {% if s.summary %}{% set lines = s.summary.split("\n") %}
     {% if lines | length > 1 %}<ul class="summary lines">{% for ln in lines %}<li>{{ ln }}</li>{% endfor %}</ul>
     {% else %}<p class="summary">{{ s.summary }}</p>{% endif %}{% endif %}
-    <p class="outlets"><b>Cubierto por</b> {{ s.outlet_names | join(", ") }}</p>
+    {% set links = s.outlet_links %}
+    <div class="outlets"><b>Cubierto por</b>
+      {% for o in links[:4] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}
+      {% if links | length > 4 %}
+      <details class="more"><summary>y {{ links | length - 4 }} más</summary>{% for o in links[4:] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</details>
+      {% endif %}
+    </div>
   </article>
 {% endmacro %}
 

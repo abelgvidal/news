@@ -8,7 +8,7 @@ from .cluster import Params, cluster_pending, reset_clusters
 from .embed import DEFAULT_MODEL, embed_pending
 from .fetch import fetch_all
 from .render import attach_summaries, build_stories, top_stories, write_site
-from .summarize import summarize_stories
+from .summarize import run_stats, summarize_stories
 
 DEFAULT_DB = Path("data/agregador.db")
 DEFAULT_FEEDS = Path("feeds.toml")
@@ -28,6 +28,8 @@ def main() -> None:
     p_run = sub.add_parser("run", help="full cycle: fetch, purge, embed, cluster, render")
     p_run.add_argument("--out", type=Path, default=DEFAULT_SITE)
     sub.add_parser("summarize", help="write summaries for the top stories (needs Claude credentials)")
+    p_stats = sub.add_parser("stats", help="summary volume, retries, fallbacks and estimated spend")
+    p_stats.add_argument("--days", type=int, default=7)
     p_cluster = sub.add_parser("cluster", help="assign unclustered articles to clusters")
     p_cluster.add_argument("--threshold", type=float, default=Params().threshold)
     p_re = sub.add_parser("recluster", help="drop all clusters and rebuild (re-embeds if the model changed)")
@@ -68,6 +70,18 @@ def main() -> None:
                      calls, len(pages))
     elif args.command == "summarize":
         print(f"{summarize_top(conn, load_countries(args.feeds))} summaries written")
+    elif args.command == "stats":
+        st = run_stats(conn, args.days)
+        if not st["attempted"]:
+            print(f"No summary runs in the last {args.days} days.")
+        else:
+            print(f"Last {args.days} days: {st['runs']} runs, {st['attempted']} summaries attempted "
+                  f"({st['attempted_per_day']:.0f}/day), {st['stored']} stored, "
+                  f"{st['unverified']} fell back to the original headline ({st['fallback_rate']:.0%})")
+            print(f"Drafts per summary: {st['drafts_per_story']:.2f} | verifications: {st['ver']} | "
+                  f"escalated to the stronger writer: {st['esc']}")
+            print(f"Estimated spend: ${st['cost']:.3f} total, ${st['cost_per_day']:.3f}/day, "
+                  f"~${st['cost_per_month']:.2f}/month")
     elif args.command == "embed":
         print(f"{embed_pending(conn)} articles embedded")
     elif args.command == "cluster":

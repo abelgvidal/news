@@ -7,8 +7,9 @@ import pytest
 from agregador import db
 from agregador.render import Story
 from agregador.summarize import (
-    SUMMARY_TAG, UnverifiedSummary, VERIFY_SYSTEM, build_prompt, check_headline, check_lines,
-    check_numbers, needs_refresh, parse_response, select_sources, summarize_stories, summarize_story,
+    ESCALATION_MODEL, SUMMARY_MODEL, SUMMARY_TAG, UnverifiedSummary, Usage, VERIFY_MODEL, VERIFY_SYSTEM,
+    build_prompt, check_headline, check_lines, check_numbers, needs_refresh, parse_response, run_stats,
+    select_sources, summarize_stories, summarize_story,
 )
 
 NOW = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
@@ -27,12 +28,13 @@ class FakeClient:
     def __init__(self, drafts=None, verdicts=None, fail=False):
         self.drafts, self.verdicts, self.fail = drafts or [GOOD], verdicts or [[]], fail
         self.gen_calls = self.verify_calls = 0
-        self.prompts = []
+        self.prompts, self.models = [], []
         self.messages = self
 
     def create(self, **kwargs):
         if self.fail:
             raise RuntimeError("boom")
+        self.models.append(kwargs["model"])
         if kwargs["system"] == VERIFY_SYSTEM:
             payload = {"problemas": self.verdicts[min(self.verify_calls, len(self.verdicts) - 1)]}
             self.verify_calls += 1
@@ -41,7 +43,8 @@ class FakeClient:
             self.gen_calls += 1
             self.prompts.append(kwargs["messages"][0]["content"])
         block = SimpleNamespace(type="text", text=json.dumps(payload))
-        return SimpleNamespace(stop_reason="end_turn", content=[block])
+        return SimpleNamespace(stop_reason="end_turn", content=[block],
+                               usage=SimpleNamespace(input_tokens=1000, output_tokens=100))
 
 
 @pytest.fixture
@@ -194,3 +197,66 @@ def test_api_failures_stop_after_consecutive_errors(conn):
     bad = FakeClient(fail=True)
     summarize_stories(conn, [story(cid=i) for i in range(1, 8)], bad)
     assert conn.execute("SELECT COUNT(*) FROM summary").fetchone()[0] == 0
+
+
+# --- models, escalation, usage ---------------------------------------------------------------
+
+def test_cheap_model_writes_the_stronger_model_verifies():
+    client = FakeClient()
+    summarize_story(client, story())
+    assert client.models == [SUMMARY_MODEL, VERIFY_MODEL]
+
+
+def test_the_last_attempt_is_written_by_the_stronger_model():
+    client = FakeClient(verdicts=[["afirmación sin respaldo"]])
+    with pytest.raises(UnverifiedSummary):
+        summarize_story(client, story())
+    assert client.models == [SUMMARY_MODEL, VERIFY_MODEL, SUMMARY_MODEL, VERIFY_MODEL,
+                             ESCALATION_MODEL, VERIFY_MODEL]
+
+
+def test_usage_counts_calls_tokens_and_cost():
+    usage, client = Usage(), FakeClient(verdicts=[["x"], []])
+    summarize_story(client, story(), usage)
+    assert (usage.gen_calls, usage.verify_calls, usage.escalations) == (2, 2, 0)
+    assert usage.tokens[SUMMARY_MODEL] == [2000, 200] and usage.tokens[VERIFY_MODEL] == [2000, 200]
+    # haiku: 2000*0.10/1e6 + 200*0.50/1e6 ; sonnet: 2000*2/1e6 + 200*10/1e6
+    assert usage.cost_usd == pytest.approx(0.0003 + 0.006)
+
+
+def test_runs_are_recorded_and_aggregated(conn):
+    summarize_stories(conn, [story()], FakeClient())
+    summarize_stories(conn, [story(n=9)], FakeClient(verdicts=[["sin respaldo"]]))  # nothing passes
+    row = conn.execute("SELECT * FROM summary_run ORDER BY id").fetchall()
+    assert [(r["attempted"], r["stored"], r["unverified"]) for r in row] == [(1, 1, 0), (1, 0, 1)]
+    st = run_stats(conn, days=7)
+    assert (st["attempted"], st["stored"], st["unverified"]) == (2, 1, 1)
+    assert st["fallback_rate"] == 0.5 and st["gen"] == 4 and st["esc"] == 1 and st["cost"] > 0
+
+
+def test_nothing_attempted_records_no_run(conn):
+    summarize_stories(conn, [story()], FakeClient())
+    summarize_stories(conn, [story()], FakeClient())  # cached
+    assert conn.execute("SELECT COUNT(*) FROM summary_run").fetchone()[0] == 1
+
+
+def test_last_attempt_over_length_is_kept_when_verified():
+    long_lines = {"headline": "Francia impone toques de queda en París",
+                  "lines": ["una dos tres cuatro cinco seis siete ocho nueve diez once doce trece catorce", "Dos."]}
+    client = FakeClient(drafts=[long_lines])  # every draft runs long; the verifier finds nothing wrong
+    headline, text = summarize_story(client, story())
+    assert headline == long_lines["headline"] and "catorce" in text
+    assert client.gen_calls == 3 and client.verify_calls == 1  # only the last, tolerated draft is verified
+
+
+def test_over_length_never_excuses_a_real_problem():
+    quoted = {"headline": 'Feijóo: "no voy a fallar"', "lines": ["Una.", "Dos."]}
+    with pytest.raises(UnverifiedSummary):
+        summarize_story(FakeClient(drafts=[quoted]), story())
+
+
+def test_last_attempt_over_length_still_fails_if_verification_fails():
+    long_lines = {"headline": "Titular válido aquí",
+                  "lines": ["una dos tres cuatro cinco seis siete ocho nueve diez once doce trece catorce", "Dos."]}
+    with pytest.raises(UnverifiedSummary):
+        summarize_story(FakeClient(drafts=[long_lines], verdicts=[["sin respaldo"]]), story())
