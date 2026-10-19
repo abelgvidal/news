@@ -1,11 +1,14 @@
 """Incremental threshold clustering of article embeddings."""
 import json
+import logging
 import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 import numpy as np
+
+log = logging.getLogger(__name__)
 
 _ENTITY_RE = re.compile(r"\b([A-ZÁÉÍÓÚÑ][\wáéíóúñü]{3,}|\d{2,})\b")
 # Capitalized words that are common sentence starters / generic, not entities.
@@ -22,6 +25,7 @@ class Params:
     same_feed_threshold: float = 0.95  # stricter if the outlet is already in the cluster
     entity_free_threshold: float = 0.94  # above this, no entity overlap needed
     window_hours: int = 48
+    merge_threshold: float = 0.965  # min centroid-to-centroid similarity to fuse two clusters
 
 
 @dataclass
@@ -105,6 +109,65 @@ def _load_active(conn: sqlite3.Connection, model: str, since: datetime) -> dict[
     }
 
 
+def plan_merges(clusters: list[Cluster], threshold: float) -> list[tuple[int, int, float]]:
+    """Plan which clusters to fuse: (keep_id, drop_id, similarity), best pair first.
+
+    Only clusters of the same country are compared. After each fusion the merged centroid is
+    recomputed and the search repeats, so a fusion can enable or block later ones. The larger
+    cluster survives.
+    """
+    live = {c.id: c for c in clusters}
+    merges: list[tuple[int, int, float]] = []
+    while len(live) > 1:
+        ids = list(live)
+        cents = np.stack([live[i].centroid for i in ids])
+        sims = cents @ cents.T
+        countries = np.array([live[i].country for i in ids])
+        sims[countries[:, None] != countries[None, :]] = -1.0
+        np.fill_diagonal(sims, -1.0)
+        a, b = np.unravel_index(np.argmax(sims), sims.shape)
+        if sims[a, b] < threshold:
+            break
+        keep, drop = sorted((live[ids[a]], live[ids[b]]), key=lambda c: (-c.size, c.id))
+        merges.append((keep.id, drop.id, float(sims[a, b])))
+        keep.vector_sum = keep.vector_sum + drop.vector_sum
+        keep.size += drop.size
+        keep.entities |= drop.entities
+        keep.feed_ids |= drop.feed_ids
+        keep.last_published_at = max(keep.last_published_at, drop.last_published_at)
+        del live[drop.id]
+    return merges
+
+
+def merge_clusters(conn: sqlite3.Connection, model: str, params: Params = Params()) -> int:
+    """Fuse near-identical active clusters of the same country. Returns the number of fusions."""
+    latest = conn.execute(
+        "SELECT MAX(last_published_at) FROM cluster WHERE model = ?", (model,)
+    ).fetchone()[0]
+    if latest is None:
+        return 0
+    since = datetime.fromisoformat(latest) - timedelta(hours=params.window_hours)
+    active = _load_active(conn, model, since)
+    merges = plan_merges(list(active.values()), params.merge_threshold)
+    for keep_id, drop_id, sim in merges:
+        keep = active[keep_id]  # plan_merges already folded the dropped cluster into it
+        conn.execute(
+            "UPDATE cluster_member SET cluster_id = ?, "
+            "note = TRIM(COALESCE(note, '') || ' merged from cluster ' || ? || ' (sim ' || ? || ')') "
+            "WHERE cluster_id = ?",
+            (keep_id, drop_id, f"{sim:.3f}", drop_id),
+        )
+        conn.execute(
+            "UPDATE cluster SET vector_sum = ?, size = ?, entities = ?, feed_ids = ?, "
+            "last_published_at = ? WHERE id = ?",
+            (keep.vector_sum.tobytes(), keep.size, json.dumps(sorted(keep.entities)),
+             json.dumps(sorted(keep.feed_ids)), keep.last_published_at.isoformat(), keep_id),
+        )
+        conn.execute("DELETE FROM cluster WHERE id = ?", (drop_id,))
+    conn.commit()
+    return len(merges)
+
+
 def cluster_pending(
     conn: sqlite3.Connection, model: str, params: Params = Params()
 ) -> tuple[int, int]:
@@ -121,6 +184,7 @@ def cluster_pending(
         (model,),
     ).fetchall()
     if not rows:
+        merge_clusters(conn, model, params)
         return 0, 0
 
     oldest = datetime.fromisoformat(rows[0]["published_at"]) - timedelta(hours=params.window_hours)
@@ -169,6 +233,9 @@ def cluster_pending(
              result.runner_up_similarity, result.note),
         )
     conn.commit()
+    merged = merge_clusters(conn, model, params)
+    if merged:
+        log.info("merged %d near-identical clusters", merged)
     return len(rows), new_clusters
 
 

@@ -66,3 +66,52 @@ def test_clusters_never_mix_countries(tmp_path):
         "SELECT c.country, COUNT(*) n FROM cluster c JOIN cluster_member m ON m.cluster_id = c.id "
         "GROUP BY c.id ORDER BY c.country").fetchall()
     assert [(r["country"], r["n"]) for r in rows] == [("ar", 1), ("es", 2)]
+
+
+def _c(cid, vec, size=1, country="es"):
+    c = cluster(cid, vec)
+    c.size, c.country = size, country
+    return c
+
+
+def test_plan_merges_fuses_near_identical_and_keeps_the_larger():
+    from agregador.cluster import plan_merges
+
+    big, small = _c(1, unit(1, 0.02), size=8), _c(2, unit(1, 0.0), size=3)
+    other = _c(3, unit(0, 1), size=5)
+    merges = plan_merges([big, small, other], threshold=0.965)
+    assert [(k, d) for k, d, _ in merges] == [(1, 2)]
+    assert big.size == 11
+
+
+def test_plan_merges_never_crosses_countries_or_fuses_distinct_stories():
+    from agregador.cluster import plan_merges
+
+    same_vec_other_country = [_c(1, unit(1, 0), country="es"), _c(2, unit(1, 0), country="ar")]
+    assert plan_merges(same_vec_other_country, 0.965) == []
+    distinct = [_c(1, unit(1, 0.4)), _c(2, unit(1, 0.0))]  # sim ~0.93 < 0.965
+    assert plan_merges(distinct, 0.965) == []
+
+
+def test_merge_clusters_moves_members_and_deletes_the_dropped_cluster(tmp_path):
+    from agregador import db
+    from agregador.cluster import merge_clusters
+
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    conn.execute("INSERT INTO feed (id, name, url) VALUES (1, 'A', 'a')")
+    for cid, aid, n in [(1, 1, 2), (2, 2, 1)]:
+        conn.execute(
+            "INSERT INTO cluster (id, model, vector_sum, size, feed_ids, created_at, last_published_at) "
+            "VALUES (?, 'm', ?, ?, '[1]', 'x', '2026-10-19T10:00:00+00:00')",
+            (cid, (unit(1, 0) * n).tobytes(), n))
+        conn.execute(
+            "INSERT INTO article (id, feed_id, url, title, published_at, fetched_at) "
+            "VALUES (?, 1, ?, 't', '2026-10-19T10:00:00+00:00', 'x')", (aid, f"u{aid}"))
+        conn.execute("INSERT INTO cluster_member (article_id, cluster_id) VALUES (?, ?)", (aid, cid))
+    assert merge_clusters(conn, "m", Params(merge_threshold=0.965)) == 1
+    assert [r[0] for r in conn.execute("SELECT id FROM cluster")] == [1]
+    rows = conn.execute("SELECT cluster_id, note FROM cluster_member ORDER BY article_id").fetchall()
+    assert [r["cluster_id"] for r in rows] == [1, 1]
+    assert "merged from cluster 2" in rows[1]["note"]
+    assert conn.execute("SELECT size FROM cluster").fetchone()[0] == 3
