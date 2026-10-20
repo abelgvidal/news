@@ -5,6 +5,7 @@ code = "int"
 name = "International"
 tz = "Europe/Madrid"
 lang = "en"
+max_per_country = 1  # one story per country (a dictionary: see countries.py / countries.toml)
 
 [[country]]
 code = "es"

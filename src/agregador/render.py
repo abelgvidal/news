@@ -1,6 +1,7 @@
 """Render the front page as static HTML: each story is a cluster's most representative real headline."""
 import math
 import os
+from collections import Counter
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -12,6 +13,7 @@ import numpy as np
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from .config import Country
+from .countries import primary_country
 from .foreign import centroid, entity_stems, judge
 from .representative import choose_story
 
@@ -77,6 +79,11 @@ class Story:
     @property
     def outlets(self) -> int:
         return len({s["name"] for s in self.sources})
+
+    @property
+    def country(self) -> str | None:
+        """The country the story is about (None if unclear or mixed), from its headlines."""
+        return primary_country([s["title"] for s in self.sources])
 
     @property
     def other_outlets(self) -> list[dict]:
@@ -149,12 +156,21 @@ def ranked(stories: list[Story]) -> list[Story]:
     return sorted((s for s in stories if s.outlets > 1), key=lambda s: s.score, reverse=True)
 
 
-def top_stories(stories: list[Story], exclude=None) -> list[Story]:
-    """The front page: the most covered stories, skipping those `exclude(story)` rejects."""
-    front = []
+def top_stories(stories: list[Story], exclude=None, max_per_country: int = 0) -> list[Story]:
+    """The front page: the most covered stories, skipping those `exclude(story)` rejects.
+
+    With `max_per_country`, a country already holding that many stories gets no more (the next stories
+    take the place); stories about no clear country are never limited.
+    """
+    front, per_country = [], Counter()
     for story in ranked(stories):
         if exclude and exclude(story):
             continue
+        country = story.country if max_per_country else None
+        if country and per_country[country] >= max_per_country:
+            continue
+        if country:
+            per_country[country] += 1
         front.append(story)
         if len(front) == MAX_STORIES:
             break
@@ -212,7 +228,7 @@ def write_site(
         if country.exclude_foreign:  # world news belongs to the other editions
             others = [s for c in countries if c.code != country.code for s in ranked(built[c.code])[:OTHERS_TOP]]
             exclude = foreign_filter(others)
-        stories = top_stories(built[country.code], exclude)
+        stories = top_stories(built[country.code], exclude, country.max_per_country)
         home = i == 0
         html = render_page(stories, now, country, countries, root="" if home else "../")
         target = out_dir / "index.html" if home else out_dir / country.code / "index.html"
