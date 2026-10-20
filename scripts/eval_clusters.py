@@ -3,9 +3,10 @@
 Self-contained: embeds the labeled articles (title + summary, like production) with the local model, so
 it does not depend on the database (articles are purged after 30 days). Usage:
 
-    uv run python scripts/eval_clusters.py [model] [--certain]
+    uv run python scripts/eval_clusters.py [model] [--certain] [--file tests/labeled_clusters_int.csv]
 
---certain drops the articles marked uncertain. The labels are a first pass by a language model: review them.
+--certain drops the articles marked uncertain; --file picks the labeled set (default: the Spanish one, the
+other is the English International edition). The labels are a first pass by a language model: review them.
 """
 import collections
 import csv
@@ -17,9 +18,13 @@ import numpy as np
 from agregador.embed import DEFAULT_MODEL, article_text, encode
 from agregador.representative import choose_story
 
-args = [a for a in sys.argv[1:] if not a.startswith("--")]
+argv = sys.argv[1:]
+path = "tests/labeled_clusters.csv"
+if "--file" in argv:
+    i = argv.index("--file"); path = argv[i + 1]; del argv[i:i + 2]
+args = [a for a in argv if not a.startswith("--")]
 model = args[0] if args else DEFAULT_MODEL
-rows = list(csv.DictReader(open("tests/labeled_clusters.csv")))
+rows = list(csv.DictReader(open(path)))
 if "--certain" in sys.argv:
     rows = [r for r in rows if r["uncertain"] != "1"]
 vecs = dict(zip((r["article_id"] for r in rows), encode([article_text(r["title"], r["summary"]) for r in rows], model)))
