@@ -95,6 +95,11 @@ url = "https://www.infolibre.es/rss/"
 country = "es"
 
 
+[[feed]]
+name = "El Periódico de España"
+url = "https://www.epe.es/es/rss/espana/rss.xml"
+country = "es"
+
 # --- Argentina
 
 [[feed]]
@@ -159,6 +164,6 @@ country = "ar"
 
 
 # No usable RSS (blocked, removed or stale) as of 2026-10-19:
-#   España: RTVE, La Razón, Público, El Periódico, Cadena SER, Marca, El Independiente.
+#   España: RTVE, La Razón, Público, El Periódico (Barcelona), Cadena SER, Marca, El Independiente.
 #   Argentina: El Destape, La Voz, Cadena 3, Crónica, La Capital, Los Andes, MDZ.
 # See REQUIREMENTS.md section 5.
