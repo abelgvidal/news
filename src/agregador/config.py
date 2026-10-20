@@ -10,6 +10,7 @@ class FeedConfig:
     country: str = "es"
     weight: float = 1.0
     user_agent: str | None = None  # override for the few feeds whose firewall rejects our default one
+    paywall: bool = False  # articles often need a subscription: shown with a lock
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class Country:
     code: str
     name: str
     tz: str = "UTC"
+    lang: str = "es"  # language of the page: labels and dates (the headlines are shown as published)
 
 
 def _load(path: Path) -> dict:

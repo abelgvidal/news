@@ -42,3 +42,18 @@ def test_feed_user_agent_override_is_sent(tmp_path):
     assert seen["ua"] == "default-agent"
     fetch_feed(conn, client, FeedConfig("B", "https://b.example/rss", user_agent="custom-agent"))
     assert seen["ua"] == "custom-agent"
+
+
+def test_the_paywall_flag_is_stored_and_updated_from_the_config(tmp_path):
+    import httpx
+
+    from agregador.config import FeedConfig
+    from agregador.fetch import fetch_feed
+
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=FIXTURE.read_bytes())))
+    fetch_feed(conn, client, FeedConfig("A", "https://a.example/rss", paywall=True))
+    assert conn.execute("SELECT paywall FROM feed").fetchone()[0] == 1
+    fetch_feed(conn, client, FeedConfig("A", "https://a.example/rss", paywall=False))      # edited in feeds.toml
+    assert conn.execute("SELECT paywall FROM feed").fetchone()[0] == 0

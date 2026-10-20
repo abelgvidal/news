@@ -9,11 +9,12 @@ from agregador.render import Story, build_stories, render_page, score, top_stori
 NOW = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
 
 
-def story(cid, outlets, hours_ago, headline="Titular <b>"):
+def story(cid, outlets, hours_ago, headline="Titular <b>", paywalled=()):
     t = NOW - timedelta(hours=hours_ago)
     sources = [{"name": f"M{i}", "title": headline if i == 0 else f"otro {i}", "url": f"https://e.com/{cid}/{i}",
-                "published_at": t, "similarity": 1.0 - i * 0.01, "image_url": None} for i in range(outlets)]
-    return Story(cid, headline, sources[0]["url"], "M0", None, t, score(outlets, t, NOW), sources)
+                "published_at": t, "similarity": 1.0 - i * 0.01, "image_url": None, "paywall": f"M{i}" in paywalled}
+               for i in range(outlets)]
+    return Story(cid, headline, sources[0]["url"], "M0", "M0" in paywalled, None, t, score(outlets, t, NOW), sources)
 
 
 def test_score_prefers_more_outlets_and_fresher():
@@ -144,3 +145,36 @@ def test_the_image_is_the_representatives_or_the_closest_article_that_has_one(tm
     assert build_stories(conn, "m", NOW, "es")[0].image_url == "https://img.example/b.jpg"
     conn.execute("UPDATE article SET image_url = 'javascript:x' WHERE id = 2")
     assert build_stories(conn, "m", NOW, "es")[0].image_url == "https://img.example/c.jpg"   # unsafe one skipped
+
+
+# --- language per page, site title, locks ---------------------------------------------------
+
+EN = Country("int", "International", "Europe/Madrid", "en")
+
+
+def test_an_english_page_has_english_labels_dates_and_title():
+    es = Country("es", "Spain", "Europe/Madrid", "es")
+    html = render_page([story(1, 7, 1)], NOW, EN, [EN, es])
+    assert '<html lang="en">' in html and "<title>News Aggregator · International</title>" in html
+    assert "<h1>News Aggregator</h1>" in html
+    assert "Monday, 19 October 2026" in html and "Most covered in the press" in html
+    assert "7 outlets" in html and "<b>Also in</b>" in html and "and 2 more" in html
+    assert ">International</a>" in html and ">Spain</a>" in html            # tabs in English
+
+
+def test_a_spanish_page_keeps_spanish_labels_but_the_english_title():
+    html = render_page([story(1, 7, 1)], NOW)
+    assert "<h1>News Aggregator</h1>" in html and "lunes, 19 de octubre de 2026" in html
+    assert "7 medios" in html and "<b>También en</b>" in html and "y 2 más" in html
+
+
+def test_paywalled_outlets_get_a_lock_where_they_are_named_and_others_do_not():
+    s = story(1, 4, 1, paywalled={"M0", "M2"})
+    html = render_page([s], NOW, EN)
+    assert html.count("🔒") == 2                                           # the source label and M2 in "Also in"
+    assert 'title="May require a subscription"' in html
+    assert s.other_outlets[1]["paywall"] is True and s.other_outlets[0]["paywall"] is False
+
+
+def test_no_lock_when_nothing_is_paywalled():
+    assert "🔒" not in render_page([story(1, 4, 1)], NOW, EN)

@@ -30,11 +30,19 @@ _STOP = set("para como pero sobre entre desde hasta tras ante este esta estos es
             "porque segun mas menos muy tambien todo toda todos todas otro otra otros otras cada tres dos cinco "
             "cuatro mil millones anos dia dias hoy ayer mismo misma parte tiene tienen puede pueden hace hacen "
             "sera seran fue fueron esta estan estar ser haber hay sido nuevo nueva primero primera ultimo ultima "
-            "gran grande".split())
+            "gran grande with from that this have been will after over their about says said what which would could "
+            "into than they them were more most when where while also amid just only some other against before "
+            "between during under news live updates".split())
 
 _QUOTES = '"“”«»'
-_LIVE = re.compile(r"\b(en directo|en vivo|[uú]ltima hora|minuto a minuto|directo)\b", re.IGNORECASE)
-_OPINION = re.compile(r"^(opini[oó]n|editorial|an[aá]lisis|columna|cr[oó]nica)\b", re.IGNORECASE)
+_LIVE = re.compile(
+    r"\b(en directo|en vivo|[uú]ltima hora|minuto a minuto|directo|live updates|live blog|live|as it happened|"
+    r"firstft|podcast|newsletter)\b",
+    re.IGNORECASE,
+)
+_OPINION = re.compile(
+    r"^(opini[oó]n|editorial|an[aá]lisis|columna|cr[oó]nica|opinion|analysis|letters|column)\b", re.IGNORECASE
+)
 
 
 def headline_penalties(title: str) -> int:
