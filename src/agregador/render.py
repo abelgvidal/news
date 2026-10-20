@@ -1,4 +1,5 @@
 """Render the front page as static HTML."""
+import json
 import math
 import os
 import sqlite3
@@ -44,6 +45,16 @@ class Story:
     score: float
     sources: list[dict]  # name, title, snippet, url, published_at
     summary: str | None = None
+    covering: list[str] | None = None  # outlets that tell the main event (set once summarized)
+    skip: bool = False  # the texts share no main event: never shown
+
+    @property
+    def covered_sources(self) -> list[dict]:
+        """The articles that actually tell the main event; all of them until the story is summarized."""
+        if self.covering is None:
+            return self.sources
+        wanted = set(self.covering)
+        return [s for s in self.sources if s["name"] in wanted]
 
     @property
     def outlets(self) -> int:
@@ -51,7 +62,7 @@ class Story:
 
     @property
     def outlet_names(self) -> list[str]:
-        return sorted({s["name"] for s in self.sources})
+        return sorted({s["name"] for s in self.covered_sources})
 
     @property
     def outlet_links(self) -> list[dict]:
@@ -61,7 +72,7 @@ class Story:
         safe URL is still listed, just not linked.
         """
         links: dict[str, str | None] = {}
-        for src in self.sources:  # sources are ordered most representative first
+        for src in self.covered_sources:  # sources are ordered most representative first
             url = src["url"] if urlsplit(src["url"]).scheme in ("http", "https") else None
             if links.get(src["name"]) is None:
                 links[src["name"]] = url
@@ -112,19 +123,33 @@ def build_stories(
     return stories
 
 
+def ranked(stories: list[Story]) -> list[Story]:
+    """Stories told by more than one outlet, best first by outlets with a recency boost."""
+    return sorted((s for s in stories if s.outlets > 1), key=lambda s: s.score, reverse=True)
+
+
 def top_stories(stories: list[Story]) -> list[Story]:
-    """The most covered stories, ranked by outlets with a recency boost."""
-    multi = (s for s in stories if s.outlets > 1)
-    return sorted(multi, key=lambda s: s.score, reverse=True)[:MAX_STORIES]
+    """The front page: ranked, without stories whose texts share no main event."""
+    return [s for s in ranked(stories) if not s.skip][:MAX_STORIES]
 
 
-def attach_summaries(conn: sqlite3.Connection, stories: list[Story]) -> None:
+def attach_summaries(conn: sqlite3.Connection, stories: list[Story], now: datetime | None = None) -> None:
+    """Add the stored summary to each story and rank by the outlets that really cover it."""
+    now = now or datetime.now(UTC)
     for s in stories:
         row = conn.execute(
-            "SELECT headline, text FROM summary WHERE cluster_id = ?", (s.cluster_id,)
+            "SELECT headline, text, outlets, status FROM summary WHERE cluster_id = ?", (s.cluster_id,)
         ).fetchone()
-        if row:
-            s.headline, s.summary = row["headline"], row["text"]
+        if not row:
+            continue
+        if row["status"] == "skip":
+            s.skip = True
+            continue
+        s.headline, s.summary = row["headline"], row["text"]
+        covering = json.loads(row["outlets"] or "[]")
+        if covering:  # older rows have none: keep every outlet of the cluster
+            s.covering = covering
+            s.score = score(s.outlets, s.updated_at, now)
 
 
 def _nav(countries: list[Country], current: Country, root: str) -> list[dict]:
@@ -166,8 +191,9 @@ def write_site(
     now = datetime.now(UTC)
     paths = []
     for i, country in enumerate(countries):
-        stories = top_stories(build_stories(conn, model, now, country.code))
-        attach_summaries(conn, stories)
+        stories = build_stories(conn, model, now, country.code)
+        attach_summaries(conn, stories, now)
+        stories = top_stories(stories)
         home = i == 0
         html = render_page(stories, now, country, countries, root="" if home else "../")
         target = out_dir / "index.html" if home else out_dir / country.code / "index.html"

@@ -70,3 +70,32 @@ def test_only_http_urls_become_links_and_unsafe_ones_are_dropped():
     assert "javascript:" not in html and "data:text" not in html
     assert "M0" in html and "M1" in html  # still listed, just not linked
     assert 'href="https://e.com/1/2"' in html
+
+
+def test_only_the_outlets_that_cover_the_event_are_counted_and_linked():
+    s = story(1, 6, 1)
+    s.covering = ["M0", "M2", "M4"]
+    assert (s.outlets, s.outlet_names) == (3, ["M0", "M2", "M4"])
+    html = render_page([s], NOW)
+    assert "3 medios" in html and 'href="https://e.com/1/2"' in html
+    assert 'href="https://e.com/1/1"' not in html and 'href="https://e.com/1/3"' not in html
+
+
+def test_ranking_uses_the_honest_count_and_skipped_stories_never_appear(tmp_path):
+    from agregador import db
+    from agregador.render import attach_summaries, top_stories
+
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    for cid in (1, 2, 3):
+        conn.execute("INSERT INTO cluster (id, model, vector_sum, size, created_at, last_published_at) "
+                     "VALUES (?, 'm', x'00', 3, 'x', 'x')", (cid,))
+    rows = [(1, "ok", '["M0","M1"]', "Cubre dos"), (2, "skip", "[]", ""), (3, "ok", '["M0","M1","M2","M3"]', "Cubre cuatro")]
+    for cid, status, outlets, headline in rows:
+        conn.execute("INSERT INTO summary (cluster_id, model, n_members, headline, text, created_at, outlets, status) "
+                     "VALUES (?, 'x', 6, ?, 'a\nb', 'x', ?, ?)", (cid, headline, outlets, status))
+    stories = [story(1, 6, 1), story(2, 6, 1), story(3, 6, 1)]   # raw counts: six outlets each
+    attach_summaries(conn, stories, NOW)
+    top = top_stories(stories)
+    assert [s.headline for s in top] == ["Cubre cuatro", "Cubre dos"]   # 4 outlets beats 2; the skipped one is gone
+    assert [s.outlets for s in top] == [4, 2]

@@ -14,7 +14,7 @@ log = logging.getLogger(__name__)
 SUMMARY_MODEL = "claude-haiku-5-5"  # writes the drafts: cheap
 VERIFY_MODEL = "claude-sonnet-5-5"  # checks every claim: a different, stronger model than the writer
 ESCALATION_MODEL = "claude-sonnet-5-5"  # writes the last attempt when the cheap model keeps failing
-SUMMARY_VERSION = "telegraphic-2"  # bump when the prompt or format changes: stored summaries are rebuilt
+SUMMARY_VERSION = "telegraphic-3"  # bump when the prompt or format changes: stored summaries are rebuilt
 SUMMARY_TAG = f"{SUMMARY_MODEL}/{SUMMARY_VERSION}"
 MAX_ARTICLES_IN_PROMPT = 12
 MAX_SNIPPET_CHARS = 280
@@ -33,6 +33,9 @@ MAX_LINE_WORDS = 12
 TARGET_HEADLINE_CHARS = 70
 TARGET_LINE_WORDS = 10
 N_LINES = 2
+# A story must be one event told by several outlets, not a bag of topics.
+MIN_COVERING_OUTLETS = 3
+MIN_COVERING_SHARE = 0.5  # of the outlets the model saw
 
 # USD per million tokens (input, output). Used only to report estimated spend.
 PRICES = {"claude-haiku-5-5": (0.10, 0.50), "claude-sonnet-5-5": (2.00, 10.00)}
@@ -51,6 +54,10 @@ SYSTEM = (
     "con lo que NO está en el titular. Nunca repitas nada del titular. Elige lo más importante: cifras o datos "
     "secundarios, el actor que falta y qué ocurre a continuación (con fecha) si los textos lo dicen. Una sola "
     "afirmación por línea.\n"
+    "- 'outlets': los nombres de los medios (tal como aparecen entre corchetes) cuyo texto cuenta el hecho "
+    "principal de tu titular. Si los textos tratan temas distintos, titula el hecho que cuenten más medios y "
+    "lista solo los que lo cuentan. Sé estricto: un medio que habla de otra cosa, o solo del mismo asunto "
+    "general, no lo cubre.\n"
     "- Estilo: sin adjetivos ni frases hechas; cifras en vez de calificativos; cargos conocidos fuera "
     "('Feijóo (PP)'); desarrolla las siglas poco comunes (Tribunal Constitucional, no TC); sin referencias "
     "temporales relativas ('ayer', 'hoy'); usa fechas o días de la semana.\n"
@@ -64,8 +71,12 @@ SYSTEM = (
 
 SCHEMA = {
     "type": "object",
-    "properties": {"headline": {"type": "string"}, "lines": {"type": "array", "items": {"type": "string"}}},
-    "required": ["headline", "lines"],
+    "properties": {
+        "headline": {"type": "string"},
+        "lines": {"type": "array", "items": {"type": "string"}},
+        "outlets": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["headline", "lines", "outlets"],
     "additionalProperties": False,
 }
 
@@ -96,6 +107,10 @@ VERIFY_SCHEMA = {
 
 class UnverifiedSummary(Exception):
     """Every attempt broke a rule or failed verification; nothing is stored."""
+
+
+class NotAStory(Exception):
+    """The texts do not share one main event covered by enough outlets: not worth the front page."""
 
 
 @dataclass
@@ -156,13 +171,34 @@ def needs_refresh(stored_n: int | None, current_n: int) -> bool:
     return growth >= max(MIN_GROWTH, stored_n * MIN_GROWTH_RATIO)
 
 
-def parse_response(text: str) -> tuple[str, list[str]]:
+def parse_response(text: str) -> tuple[str, list[str], list[str]]:
     data = json.loads(text)
     headline = data["headline"].strip()
     lines = [ln.strip() for ln in data["lines"] if ln.strip()]
     if not headline or not lines:
         raise ValueError("empty summary")
-    return headline, lines
+    return headline, lines, [str(o).strip() for o in data.get("outlets", []) if str(o).strip()]
+
+
+def valid_outlets(claimed: list[str], visible: set[str]) -> list[str]:
+    """The claimed outlets that really were in the prompt, with their canonical spelling."""
+    canonical = {name.lower(): name for name in visible}
+    out = []
+    for name in claimed:
+        real = canonical.get(name.lower())
+        if real and real not in out:
+            out.append(real)
+    return out
+
+
+def check_coverage(covering: list[str], visible: int) -> list[str]:
+    """The main event must be told by enough outlets, and by a good share of those the model saw."""
+    if len(covering) >= MIN_COVERING_OUTLETS and len(covering) >= visible * MIN_COVERING_SHARE:
+        return []
+    return [
+        f"solo {len(covering)} de los {visible} medios cuentan el hecho principal del titular: si los textos "
+        "tratan temas distintos, titula el hecho que cuenten más medios y lista en 'outlets' todos los que lo cuentan"
+    ]
 
 
 # --- local, deterministic checks -------------------------------------------------------------
@@ -274,23 +310,31 @@ def verify(client, story: Story, headline: str, lines: list[str], usage: Usage |
     return [str(p) for p in json.loads(raw)["problemas"]]
 
 
-def summarize_story(client, story: Story, usage: Usage | None = None) -> tuple[str, str]:
+def summarize_story(client, story: Story, usage: Usage | None = None) -> tuple[str, str, list[str]]:
     """Write headline and lines; correct them up to MAX_ATTEMPTS times if a check fails.
 
-    Checks, cheapest first: format and style rules, numbers present in the sources, and a
-    verification of every claim by a stronger model. The last attempt is written by
-    ESCALATION_MODEL. Raises UnverifiedSummary if nothing passes.
+    Returns (headline, text, covering outlets). Checks, cheapest first: format and style rules,
+    numbers present in the sources, enough outlets covering the main event, and a verification of
+    every claim by a stronger model. The last attempt is written by ESCALATION_MODEL.
+    Raises NotAStory if the main event is still covered by too few outlets on the last attempt,
+    UnverifiedSummary if nothing passes.
     """
     usage = usage or Usage()
     base = build_prompt(story)
+    visible = {s["name"] for s in select_sources(story.sources)}
     prompt, problems = base, []
     for attempt in range(1, MAX_ATTEMPTS + 1):
         writer = ESCALATION_MODEL if attempt >= ESCALATE_FROM_ATTEMPT else SUMMARY_MODEL
         usage.gen_calls += 1
         usage.escalations += writer != SUMMARY_MODEL
-        headline, lines = parse_response(_ask(client, writer, SYSTEM, prompt, SCHEMA, usage))
+        headline, lines, claimed = parse_response(_ask(client, writer, SYSTEM, prompt, SCHEMA, usage))
+        covering = valid_outlets(claimed, visible)
+        coverage = check_coverage(covering, len(visible))
+        if coverage and attempt == MAX_ATTEMPTS:
+            raise NotAStory(coverage[0])
         problems = (
             check_headline(headline) + check_lines(lines) + check_numbers(headline, lines, story.sources)
+            + coverage
         )
         # Length is a style preference, fidelity is not: on the last attempt a draft that only runs
         # long is still verified and kept, rather than losing the story to a word count.
@@ -301,26 +345,29 @@ def summarize_story(client, story: Story, usage: Usage | None = None) -> tuple[s
                 if problems:
                     log.info("cluster %s: kept over the length limit after verification (%s)",
                              story.cluster_id, "; ".join(problems))
-                return headline, "\n".join(lines)
+                return headline, "\n".join(lines), covering
             problems = verdict
         prompt = (
-            f"{base}\n\nTu versión anterior (titular: '{headline}'; líneas: {lines}) no es válida: "
-            f"{'; '.join(problems)}. Escríbela de nuevo corrigiendo todos los problemas."
+            f"{base}\n\nTu versión anterior (titular: '{headline}'; líneas: {lines}; medios: {covering}) no es "
+            f"válida: {'; '.join(problems)}. Escríbela de nuevo corrigiendo todos los problemas."
         )
     raise UnverifiedSummary("; ".join(problems))
 
 
-def _record_run(conn: sqlite3.Connection, attempted: int, stored: int, unverified: int, usage: Usage) -> None:
+def _record_run(
+    conn: sqlite3.Connection, attempted: int, stored: int, unverified: int, skipped: int, usage: Usage
+) -> None:
     conn.execute(
-        "INSERT INTO summary_run (ts, attempted, stored, unverified, gen_calls, verify_calls, escalations, "
-        "cost_usd, tokens) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (datetime.now(UTC).isoformat(), attempted, stored, unverified, usage.gen_calls, usage.verify_calls,
-         usage.escalations, usage.cost_usd, json.dumps(usage.tokens)),
+        "INSERT INTO summary_run (ts, attempted, stored, unverified, skipped, gen_calls, verify_calls, "
+        "escalations, cost_usd, tokens) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (datetime.now(UTC).isoformat(), attempted, stored, unverified, skipped, usage.gen_calls,
+         usage.verify_calls, usage.escalations, usage.cost_usd, json.dumps(usage.tokens)),
     )
     conn.commit()
     log.info(
-        "summaries: %d attempted, %d stored, %d unverified | %d drafts (%d by %s), %d verifications | ~$%.4f",
-        attempted, stored, unverified, usage.gen_calls, usage.escalations, ESCALATION_MODEL,
+        "summaries: %d attempted, %d stored, %d unverified, %d not a story | %d drafts (%d by %s), "
+        "%d verifications | ~$%.4f",
+        attempted, stored, unverified, skipped, usage.gen_calls, usage.escalations, ESCALATION_MODEL,
         usage.verify_calls, usage.cost_usd,
     )
 
@@ -338,32 +385,58 @@ def _in_cooldown(conn: sqlite3.Connection, cluster_id: int, n_members: int) -> b
     return recent and not needs_refresh(row["n_members"], n_members)
 
 
-def summarize_stories(conn: sqlite3.Connection, stories: list[Story], client=None) -> int:
-    """Create or refresh summaries for the given stories. Returns the number of stories attempted.
+def _save(conn, cluster_id: int, n: int, status: str, headline: str, text: str, covering: list[str]) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO summary (cluster_id, model, n_members, headline, text, created_at, outlets, "
+        "status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (cluster_id, SUMMARY_TAG, n, headline, text, datetime.now(UTC).isoformat(),
+         json.dumps(covering, ensure_ascii=False), status),
+    )
+    conn.commit()
+
+
+def summarize_stories(
+    conn: sqlite3.Connection, stories, client=None, target: int | None = None
+) -> int:
+    """Create or refresh summaries for `stories`, best first. Returns the number attempted.
 
     Failures are logged and leave any previous summary in place; the page falls back to the
-    original headline for stories without one. Each run that did work is recorded in summary_run.
+    original headline for stories without one. A story whose texts share no main event covered by
+    enough outlets is stored as skipped and never shown. With `target`, stop once that many
+    stories can be shown (stories skipped as "not a story" do not count). Each run that did work
+    is recorded in summary_run.
     """
     if client is None:
         import anthropic
 
         client = anthropic.Anthropic()
     usage = Usage()
-    attempted = stored = unverified = failures = 0
+    attempted = stored = unverified = skipped = failures = usable = 0
     for story in stories:
+        if target is not None and usable >= target:
+            break
         row = conn.execute(
-            "SELECT n_members, model FROM summary WHERE cluster_id = ?", (story.cluster_id,)
+            "SELECT n_members, model, status FROM summary WHERE cluster_id = ?", (story.cluster_id,)
         ).fetchone()
         n = len(story.sources)
         if row and row["model"] == SUMMARY_TAG and not needs_refresh(row["n_members"], n):
+            usable += row["status"] != "skip"
             continue
         if _in_cooldown(conn, story.cluster_id, n):
+            usable += not (row and row["status"] == "skip")
             continue
         attempted += 1
         try:
-            headline, text = summarize_story(client, story, usage)
+            headline, text, covering = summarize_story(client, story, usage)
+        except NotAStory as exc:
+            skipped += 1
+            log.info("cluster %s: not a story (%s)", story.cluster_id, exc)
+            _save(conn, story.cluster_id, n, "skip", "", "", [])
+            conn.execute("DELETE FROM summary_failure WHERE cluster_id = ?", (story.cluster_id,))
+            continue
         except UnverifiedSummary as exc:
             unverified += 1
+            usable += 1  # shown with the original headline
             log.warning("cluster %s: no summary passed verification (%s)", story.cluster_id, exc)
             conn.execute(
                 "INSERT OR REPLACE INTO summary_failure (cluster_id, n_members, failed_at, reason) "
@@ -379,15 +452,11 @@ def summarize_stories(conn: sqlite3.Connection, stories: list[Story], client=Non
             continue
         failures = 0
         stored += 1
+        usable += 1
         conn.execute("DELETE FROM summary_failure WHERE cluster_id = ?", (story.cluster_id,))
-        conn.execute(
-            "INSERT OR REPLACE INTO summary (cluster_id, model, n_members, headline, text, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (story.cluster_id, SUMMARY_TAG, n, headline, text, datetime.now(UTC).isoformat()),
-        )
-        conn.commit()
+        _save(conn, story.cluster_id, n, "ok", headline, text, covering)
     if attempted:
-        _record_run(conn, attempted, stored, unverified, usage)
+        _record_run(conn, attempted, stored, unverified, skipped, usage)
     return attempted
 
 
@@ -398,7 +467,7 @@ def run_stats(conn: sqlite3.Connection, days: int = 7) -> dict:
     since = (datetime.now(UTC) - timedelta(days=days)).isoformat()
     r = conn.execute(
         "SELECT COUNT(*) runs, COALESCE(SUM(attempted),0) attempted, COALESCE(SUM(stored),0) stored, "
-        "COALESCE(SUM(unverified),0) unverified, COALESCE(SUM(gen_calls),0) gen, "
+        "COALESCE(SUM(unverified),0) unverified, COALESCE(SUM(skipped),0) skipped, COALESCE(SUM(gen_calls),0) gen, "
         "COALESCE(SUM(verify_calls),0) ver, COALESCE(SUM(escalations),0) esc, "
         "COALESCE(SUM(cost_usd),0) cost FROM summary_run WHERE ts >= ?", (since,)
     ).fetchone()
