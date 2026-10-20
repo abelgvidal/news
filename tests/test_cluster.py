@@ -115,3 +115,29 @@ def test_merge_clusters_moves_members_and_deletes_the_dropped_cluster(tmp_path):
     assert [r["cluster_id"] for r in rows] == [1, 1]
     assert "merged from cluster 2" in rows[1]["note"]
     assert conn.execute("SELECT size FROM cluster").fetchone()[0] == 3
+
+
+def test_two_big_clusters_need_the_stricter_threshold_to_fuse():
+    from agregador.cluster import plan_merges
+
+    a, b = _c(1, unit(1, 0.0), size=12), _c(2, unit(1, 0.2), size=10)   # sim ~0.98
+    assert plan_merges([a, b], 0.965, small_size=8, big_threshold=0.985) == []
+    c, d = _c(1, unit(1, 0.0), size=12), _c(2, unit(1, 0.05), size=10)  # sim ~0.9988
+    assert [(k, x) for k, x, _ in plan_merges([c, d], 0.965, small_size=8, big_threshold=0.985)] == [(1, 2)]
+
+
+def test_a_small_cluster_is_absorbed_at_the_normal_threshold():
+    from agregador.cluster import plan_merges
+
+    big, small = _c(1, unit(1, 0.0), size=40), _c(2, unit(1, 0.2), size=3)  # sim ~0.98
+    assert [(k, x) for k, x, _ in plan_merges([big, small], 0.965, small_size=8, big_threshold=0.985)] == [(1, 2)]
+
+
+def test_fusions_cannot_chain_into_one_giant_cluster():
+    from agregador.cluster import plan_merges
+
+    # A-B and B-C are each close, A-C is not: absorbing B into A must not then drag C in
+    a, b, c = _c(1, unit(1, 0.0), size=20), _c(2, unit(1, 0.25), size=3), _c(3, unit(1, 0.5), size=15)
+    merges = plan_merges([a, b, c], 0.965, small_size=8, big_threshold=0.985)
+    assert len(merges) == 1                      # b goes to one of them, and that is all
+    assert {merges[0][0], merges[0][1]} != {1, 3}  # the two big clusters never fuse

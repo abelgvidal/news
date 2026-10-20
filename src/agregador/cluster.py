@@ -25,7 +25,9 @@ class Params:
     same_feed_threshold: float = 0.95  # stricter if the outlet is already in the cluster
     entity_free_threshold: float = 0.94  # above this, no entity overlap needed
     window_hours: int = 48
-    merge_threshold: float = 0.965  # min centroid-to-centroid similarity to fuse two clusters
+    merge_threshold: float = 0.965  # min centroid-to-centroid similarity to absorb a small cluster
+    merge_small_size: int = 8  # a cluster this small (or smaller) may be absorbed at merge_threshold
+    merge_big_threshold: float = 0.985  # fusing two bigger clusters needs this much: centroids drift
 
 
 @dataclass
@@ -109,12 +111,19 @@ def _load_active(conn: sqlite3.Connection, model: str, since: datetime) -> dict[
     }
 
 
-def plan_merges(clusters: list[Cluster], threshold: float) -> list[tuple[int, int, float]]:
+def plan_merges(
+    clusters: list[Cluster],
+    threshold: float,
+    small_size: int = 8,
+    big_threshold: float = 0.985,
+) -> list[tuple[int, int, float]]:
     """Plan which clusters to fuse: (keep_id, drop_id, similarity), best pair first.
 
-    Only clusters of the same country are compared. After each fusion the merged centroid is
-    recomputed and the search repeats, so a fusion can enable or block later ones. The larger
-    cluster survives.
+    Only clusters of the same country are compared. A small cluster (<= small_size articles) is
+    absorbed into another at `threshold`; fusing two bigger ones needs the much stricter
+    `big_threshold`, because large clusters have generic centroids ("elecciones", "Francia") that
+    attract unrelated stories and let fusions chain into one huge cluster. After each fusion the
+    merged centroid is recomputed and the search repeats. The larger cluster survives.
     """
     live = {c.id: c for c in clusters}
     merges: list[tuple[int, int, float]] = []
@@ -123,10 +132,13 @@ def plan_merges(clusters: list[Cluster], threshold: float) -> list[tuple[int, in
         cents = np.stack([live[i].centroid for i in ids])
         sims = cents @ cents.T
         countries = np.array([live[i].country for i in ids])
+        sizes = np.array([live[i].size for i in ids])
+        needed = np.where(np.minimum(sizes[:, None], sizes[None, :]) <= small_size, threshold, big_threshold)
         sims[countries[:, None] != countries[None, :]] = -1.0
         np.fill_diagonal(sims, -1.0)
+        sims[sims < needed] = -1.0
         a, b = np.unravel_index(np.argmax(sims), sims.shape)
-        if sims[a, b] < threshold:
+        if sims[a, b] < 0:
             break
         keep, drop = sorted((live[ids[a]], live[ids[b]]), key=lambda c: (-c.size, c.id))
         merges.append((keep.id, drop.id, float(sims[a, b])))
@@ -148,7 +160,9 @@ def merge_clusters(conn: sqlite3.Connection, model: str, params: Params = Params
         return 0
     since = datetime.fromisoformat(latest) - timedelta(hours=params.window_hours)
     active = _load_active(conn, model, since)
-    merges = plan_merges(list(active.values()), params.merge_threshold)
+    merges = plan_merges(
+        list(active.values()), params.merge_threshold, params.merge_small_size, params.merge_big_threshold
+    )
     for keep_id, drop_id, sim in merges:
         keep = active[keep_id]  # plan_merges already folded the dropped cluster into it
         conn.execute(

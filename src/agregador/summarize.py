@@ -20,6 +20,7 @@ MAX_ARTICLES_IN_PROMPT = 12
 MAX_SNIPPET_CHARS = 280
 MAX_ATTEMPTS = 3  # draft, then up to two corrections when a check fails
 ESCALATE_FROM_ATTEMPT = 3  # the third attempt is written by ESCALATION_MODEL
+RETRY_COOLDOWN_HOURS = 3  # a story that failed is not retried before this, unless its cluster grew
 MAX_CONSECUTIVE_FAILURES = 3  # e.g. missing credentials: stop instead of failing for every story
 # Regenerate only when the cluster has grown noticeably, so a live story doesn't cost calls every cycle.
 MIN_GROWTH = 3
@@ -182,6 +183,8 @@ _META = re.compile(
     re.IGNORECASE,
 )
 _NUMBER = re.compile(r"\d[\d.,:]*\d|\d")
+# In the output, a number glued to letters is a name or a label ("20minutos", "29N"), not a figure.
+_OUTPUT_NUMBER = re.compile(r"(?<![\w.,:])(?:\d[\d.,:]*\d|\d)(?![\w])")
 _LENGTH_HINT = "recórt"  # marks the length messages of check_headline / check_lines
 
 
@@ -238,7 +241,7 @@ def check_numbers(headline: str, lines: list[str], sources: list[dict]) -> list[
     """Every number of two or more digits in the output must appear in at least one source text."""
     known = source_numbers([_source_text(s) for s in select_sources(sources)])
     missing = []
-    for token in _NUMBER.findall(" ".join([headline, *lines])):
+    for token in _OUTPUT_NUMBER.findall(" ".join([headline, *lines])):
         d = _digits(token)
         if len(d) >= 2 and d not in known and token not in missing:
             missing.append(token)
@@ -322,6 +325,19 @@ def _record_run(conn: sqlite3.Connection, attempted: int, stored: int, unverifie
     )
 
 
+def _in_cooldown(conn: sqlite3.Connection, cluster_id: int, n_members: int) -> bool:
+    """True if this story failed recently and has not grown enough to deserve another try."""
+    from datetime import timedelta
+
+    row = conn.execute(
+        "SELECT n_members, failed_at FROM summary_failure WHERE cluster_id = ?", (cluster_id,)
+    ).fetchone()
+    if not row:
+        return False
+    recent = datetime.fromisoformat(row["failed_at"]) > datetime.now(UTC) - timedelta(hours=RETRY_COOLDOWN_HOURS)
+    return recent and not needs_refresh(row["n_members"], n_members)
+
+
 def summarize_stories(conn: sqlite3.Connection, stories: list[Story], client=None) -> int:
     """Create or refresh summaries for the given stories. Returns the number of stories attempted.
 
@@ -341,12 +357,18 @@ def summarize_stories(conn: sqlite3.Connection, stories: list[Story], client=Non
         n = len(story.sources)
         if row and row["model"] == SUMMARY_TAG and not needs_refresh(row["n_members"], n):
             continue
+        if _in_cooldown(conn, story.cluster_id, n):
+            continue
         attempted += 1
         try:
             headline, text = summarize_story(client, story, usage)
         except UnverifiedSummary as exc:
             unverified += 1
             log.warning("cluster %s: no summary passed verification (%s)", story.cluster_id, exc)
+            conn.execute(
+                "INSERT OR REPLACE INTO summary_failure (cluster_id, n_members, failed_at, reason) "
+                "VALUES (?, ?, ?, ?)", (story.cluster_id, n, datetime.now(UTC).isoformat(), str(exc)[:500]))
+            conn.commit()
             continue
         except Exception as exc:
             log.warning("summary for cluster %s failed: %s", story.cluster_id, exc)
@@ -357,6 +379,7 @@ def summarize_stories(conn: sqlite3.Connection, stories: list[Story], client=Non
             continue
         failures = 0
         stored += 1
+        conn.execute("DELETE FROM summary_failure WHERE cluster_id = ?", (story.cluster_id,))
         conn.execute(
             "INSERT OR REPLACE INTO summary (cluster_id, model, n_members, headline, text, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?)",
