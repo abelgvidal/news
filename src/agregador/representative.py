@@ -21,10 +21,11 @@ NEAR_CENTER = 0.02  # penalties only separate articles within this much centrali
 MAX_HEADLINE_CHARS = 110
 
 # Membership of the core: similarity to the representative + WORD_WEIGHT * headline word overlap >= MEMBER_THRESHOLD.
-# Tuned on tests/labeled_clusters.csv (scripts/eval_clusters.py): it cut the mean error of the outlet count
-# per cluster from 1.20 to 0.47. Re-tune when the embedding model changes.
-MEMBER_THRESHOLD = 0.90
-WORD_WEIGHT = 0.6
+# Tuned on tests/labeled_clusters.csv, labeled with a strict "same specific news item" criterion (scripts/eval_clusters.py):
+# mean error of the outlet count per cluster 1.60 raw -> 0.67 (leave-one-cluster-out estimate 0.67). Re-tune when the
+# embedding model changes or the labeled set grows.
+MEMBER_THRESHOLD = 0.92
+WORD_WEIGHT = 1.5
 _STOP = set("para como pero sobre entre desde hasta tras ante este esta estos estas esos esas aqui alli donde cuando "
             "porque segun mas menos muy tambien todo toda todos todas otro otra otros otras cada tres dos cinco "
             "cuatro mil millones anos dia dias hoy ayer mismo misma parte tiene tienen puede pueden hace hacen "
