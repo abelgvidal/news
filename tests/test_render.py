@@ -248,3 +248,19 @@ def test_the_cap_and_the_exclusion_work_together():
                _about(3, 7, "Japan launches mission from Tokyo")]
     top = top_stories(stories, exclude=lambda s: s.cluster_id == 1, max_per_country=1)
     assert [s.cluster_id for s in top] == [2, 3]
+
+
+# --- flags ----------------------------------------------------------------------------------------
+
+def test_an_edition_with_flags_shows_each_storys_flag_and_a_globe_when_there_is_no_single_country():
+    flags_on = Country("int", "International", "Europe/Madrid", "en", show_flags=True)
+    france = _about(1, 5, "France imposes curfews in Paris")
+    mixed = _about(2, 4, "Putin floats a summit with Trump and Xi to discuss Ukraine deal")
+    html = render_page([france, mixed], NOW, flags_on)
+    assert '<span class="flag" title="France"' in html and "🇫🇷" in html
+    assert '<span class="flag" title="Several countries, or none in particular"' in html and "🌐" in html
+
+
+def test_an_edition_without_flags_shows_none():
+    html = render_page([_about(1, 5, "France imposes curfews in Paris")], NOW, Country("es", "Spain", "Europe/Madrid", "es"))
+    assert 'class="flag"' not in html and "🇫🇷" not in html

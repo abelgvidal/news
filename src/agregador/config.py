@@ -21,6 +21,7 @@ class Country:
     lang: str = "es"  # language of the page: labels and dates (the headlines are shown as published)
     exclude_foreign: bool = False  # keep out stories about the rest of the world (see foreign.py)
     max_per_country: int = 0  # at most this many stories about the same country (0 = no limit; see countries.py)
+    show_flags: bool = False  # a flag (or a globe when there is no single country) on each story
 
 
 def _load(path: Path) -> dict:

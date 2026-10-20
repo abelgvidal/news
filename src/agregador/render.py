@@ -13,7 +13,7 @@ import numpy as np
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from .config import Country
-from .countries import primary_country
+from .countries import flag, primary_country
 from .foreign import centroid, entity_stems, judge
 from .representative import choose_story
 
@@ -41,10 +41,10 @@ _MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "A
 LABELS = {
     "es": {"site": "News Aggregator", "outlets": "medios", "also_in": "También en", "more": "y {n} más",
            "dateline": "Lo más citado en los medios · actualizado a las", "paywall": "Puede requerir suscripción",
-           "empty": "Todavía no hay noticias agrupadas."},
+           "empty": "Todavía no hay noticias agrupadas.", "several": "Varios países o ninguno en concreto"},
     "en": {"site": "News Aggregator", "outlets": "outlets", "also_in": "Also in", "more": "and {n} more",
            "dateline": "Most covered in the press · updated at", "paywall": "May require a subscription",
-           "empty": "No grouped stories yet."},
+           "empty": "No grouped stories yet.", "several": "Several countries, or none in particular"},
 }
 
 
@@ -79,6 +79,11 @@ class Story:
     @property
     def outlets(self) -> int:
         return len({s["name"] for s in self.sources})
+
+    @property
+    def flag(self) -> str:
+        """The flag of the country the story is about, or a globe when there is no single one."""
+        return flag(self.country)
 
     @property
     def country(self) -> str | None:
