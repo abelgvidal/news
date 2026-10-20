@@ -40,14 +40,11 @@
   .side h2 { font-size:1.28rem; }
   .row3 h2 { font-size:1.2rem; }
   .row4 h2 { font-size:1.2rem; }
-  .story .summary { margin:0 0 8px; color:var(--fg); }
-  .lead .summary { font-size:1.12rem; }
-  .side .summary, .row3 .summary { font-size:0.95rem; }
-  .row4 .summary { font-size:0.95rem; }
   .story img { display:block; width:100%; aspect-ratio:16/9; object-fit:cover; margin-bottom:10px; background:var(--hair); }
   .lead img { aspect-ratio:3/2; }
-  ul.lines { padding-left:1.05em; }
-  ul.lines li { margin:0 0 3px; padding-left:.1em; }
+  .story h2 a { color:inherit; text-decoration:none; }
+  .story h2 a:hover { color:var(--accent); }
+  .source { margin:0 0 8px; font: 600 0.8rem system-ui, sans-serif; color:var(--muted); }
   .outlets { margin:0; font: 0.8rem/1.4 system-ui, sans-serif; color:var(--muted); }
   .outlets a { color:inherit; text-decoration:underline; text-decoration-color:var(--hair); text-underline-offset:2px; }
   .outlets a:hover { color:var(--accent); text-decoration-color:currentColor; }
@@ -88,19 +85,19 @@
 
 {% macro story(s, kicker=true, img=true) %}
   <article class="story">
-    {% if img and s.image_url %}<img src="{{ s.image_url }}" alt="" loading="lazy">{% endif %}
+    {% if img and s.image_url %}<img src="{{ s.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
     {% if kicker %}<div class="kicker">{{ s.outlets }} medios · {{ hora(s.updated_at) }}</div>{% endif %}
-    <h2>{{ s.headline }}</h2>
-    {% if s.summary %}{% set lines = s.summary.split("\n") %}
-    {% if lines | length > 1 %}<ul class="summary lines">{% for ln in lines %}<li>{{ ln }}</li>{% endfor %}</ul>
-    {% else %}<p class="summary">{{ s.summary }}</p>{% endif %}{% endif %}
-    {% set links = s.outlet_links %}
-    <div class="outlets"><b>Cubierto por</b>
+    <h2>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ s.headline }}</a>{% else %}{{ s.headline }}{% endif %}</h2>
+    <p class="source">{{ s.source }}</p>
+    {% set links = s.other_outlets %}
+    {% if links %}
+    <div class="outlets"><b>También en</b>
       {% for o in links[:4] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}
       {% if links | length > 4 %}
       <details class="more"><summary>y {{ links | length - 4 }} más</summary>{% for o in links[4:] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</details>
       {% endif %}
     </div>
+    {% endif %}
   </article>
 {% endmacro %}
 

@@ -7,8 +7,7 @@ from .config import load_countries, load_feeds
 from .cluster import Params, cluster_pending, reset_clusters
 from .embed import DEFAULT_MODEL, embed_pending
 from .fetch import fetch_all
-from .render import build_stories, ranked, write_site
-from .summarize import run_stats, summarize_stories
+from .render import write_site
 
 DEFAULT_DB = Path("data/agregador.db")
 DEFAULT_FEEDS = Path("feeds.toml")
@@ -27,9 +26,6 @@ def main() -> None:
     p_render.add_argument("--out", type=Path, default=DEFAULT_SITE)
     p_run = sub.add_parser("run", help="full cycle: fetch, purge, embed, cluster, render")
     p_run.add_argument("--out", type=Path, default=DEFAULT_SITE)
-    sub.add_parser("summarize", help="write summaries for the top stories (needs Claude credentials)")
-    p_stats = sub.add_parser("stats", help="summary volume, retries, fallbacks and estimated spend")
-    p_stats.add_argument("--days", type=int, default=7)
     p_cluster = sub.add_parser("cluster", help="assign unclustered articles to clusters")
     p_cluster.add_argument("--threshold", type=float, default=Params().threshold)
     p_re = sub.add_parser("recluster", help="drop all clusters and rebuild (re-embeds if the model changed)")
@@ -62,27 +58,9 @@ def main() -> None:
         purged = db.purge_old(conn)
         embedded = embed_pending(conn)
         assigned, clusters = cluster_pending(conn, DEFAULT_MODEL)
-        countries = load_countries(args.feeds)
-        calls = summarize_top(conn, countries)
-        pages = write_site(conn, DEFAULT_MODEL, args.out, countries)
-        logging.info("run: %d new, %d purged, %d embedded, %d assigned (%d new clusters), "
-                     "%d summaries -> %d pages", new, purged, embedded, assigned, clusters,
-                     calls, len(pages))
-    elif args.command == "summarize":
-        print(f"{summarize_top(conn, load_countries(args.feeds))} summaries written")
-    elif args.command == "stats":
-        st = run_stats(conn, args.days)
-        if not st["attempted"]:
-            print(f"No summary runs in the last {args.days} days.")
-        else:
-            print(f"Last {args.days} days: {st['runs']} runs, {st['attempted']} summaries attempted "
-                  f"({st['attempted_per_day']:.0f}/day), {st['stored']} stored, "
-                  f"{st['unverified']} fell back to the original headline ({st['fallback_rate']:.0%}), "
-                  f"{st['skipped']} skipped as not a story")
-            print(f"Drafts per summary: {st['drafts_per_story']:.2f} | verifications: {st['ver']} | "
-                  f"escalated to the stronger writer: {st['esc']}")
-            print(f"Estimated spend: ${st['cost']:.3f} total, ${st['cost_per_day']:.3f}/day, "
-                  f"~${st['cost_per_month']:.2f}/month")
+        pages = write_site(conn, DEFAULT_MODEL, args.out, load_countries(args.feeds))
+        logging.info("run: %d new, %d purged, %d embedded, %d assigned (%d new clusters) -> %d pages",
+                     new, purged, embedded, assigned, clusters, len(pages))
     elif args.command == "embed":
         print(f"{embed_pending(conn)} articles embedded")
     elif args.command == "cluster":
@@ -97,40 +75,6 @@ def main() -> None:
         show_clusters(conn, args.top)
     elif args.command == "explain":
         explain(conn, args.article_id)
-
-
-FILL_TARGET = 12  # stories to have ready per country: a few spare for those skipped as "not a story"
-MAX_CANDIDATES = 24
-
-
-def summarize_top(conn, countries) -> int:
-    """Summarize the best-ranked stories of each country until the front page is covered.
-
-    First by raw outlet count, with a few spare stories for those skipped as "not a story". The final
-    ranking uses the outlets that really cover each event, which can pull up a story that had no
-    summary yet, so a short second pass summarizes whatever reaches the front page without one.
-    """
-    from datetime import UTC, datetime
-
-    from .render import attach_summaries, top_stories
-
-    calls = 0
-    for country in countries:
-        try:
-            now = datetime.now(UTC)
-            candidates = ranked(build_stories(conn, DEFAULT_MODEL, now, country.code))
-            calls += summarize_stories(conn, candidates[:MAX_CANDIDATES], target=FILL_TARGET)
-            for _ in range(3):
-                stories = build_stories(conn, DEFAULT_MODEL, now, country.code)
-                attach_summaries(conn, stories, now)
-                missing = [s for s in top_stories(stories) if s.summary is None]
-                done = summarize_stories(conn, missing) if missing else 0  # failures wait out their cooldown
-                calls += done
-                if not done:
-                    break
-        except Exception as exc:  # e.g. no credentials: pages fall back to original headlines
-            logging.warning("summaries skipped for %s: %s", country.code, exc)
-    return calls
 
 
 def show_clusters(conn, top: int) -> None:

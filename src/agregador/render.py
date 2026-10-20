@@ -1,5 +1,4 @@
-"""Render the front page as static HTML."""
-import json
+"""Render the front page as static HTML: each story is a cluster's most representative real headline."""
 import math
 import os
 import sqlite3
@@ -12,8 +11,8 @@ from zoneinfo import ZoneInfo
 import numpy as np
 from jinja2 import Environment, PackageLoader, select_autoescape
 
-from . import embed
 from .config import Country
+from .representative import pick_representative
 
 ACTIVE_HOURS = 48
 HALF_LIFE_HOURS = 24
@@ -36,45 +35,37 @@ def hora_local(dt: datetime, tz: str) -> str:
     return dt.astimezone(ZoneInfo(tz)).strftime("%H:%M")
 
 
+def _web_url(url: str | None) -> str | None:
+    """Feed content is untrusted: only http(s) URLs may become links or images."""
+    return url if url and urlsplit(url).scheme in ("http", "https") else None
+
+
 @dataclass
 class Story:
     cluster_id: int
-    headline: str
-    url: str
+    headline: str  # the representative article's own headline, as published
+    url: str | None  # that article
+    source: str  # its outlet
     image_url: str | None
     updated_at: datetime
     score: float
-    sources: list[dict]  # name, title, snippet, url, published_at
-    summary: str | None = None
-    covering: list[str] | None = None  # outlets that tell the main event (set once summarized)
-    skip: bool = False  # the texts share no main event: never shown
-
-    @property
-    def covered_sources(self) -> list[dict]:
-        """The articles that actually tell the main event; all of them until the story is summarized."""
-        if self.covering is None:
-            return self.sources
-        wanted = set(self.covering)
-        return [s for s in self.sources if s["name"] in wanted]
+    sources: list[dict]  # every article, the representative first, then by similarity to it
 
     @property
     def outlets(self) -> int:
-        return len(self.outlet_names)
+        return len({s["name"] for s in self.sources})
 
     @property
-    def outlet_names(self) -> list[str]:
-        return sorted({s["name"] for s in self.covered_sources})
+    def other_outlets(self) -> list[dict]:
+        """The other outlets, each with the article closest to the representative one.
 
-    @property
-    def outlet_links(self) -> list[dict]:
-        """One entry per outlet, most representative first, linking to that outlet's article.
-
-        Feed content is untrusted, so only http(s) URLs become links; an outlet without a
-        safe URL is still listed, just not linked.
+        An outlet without a safe URL is still listed, just not linked.
         """
         links: dict[str, str | None] = {}
-        for src in self.covered_sources:  # sources are ordered most representative first
-            url = src["url"] if urlsplit(src["url"]).scheme in ("http", "https") else None
+        for src in self.sources:
+            if src["name"] == self.source:
+                continue
+            url = _web_url(src["url"])
             if links.get(src["name"]) is None:
                 links[src["name"]] = url
         return [{"name": name, "url": url} for name, url in links.items()]
@@ -91,37 +82,37 @@ def build_stories(
 ) -> list[Story]:
     since = (now - timedelta(hours=ACTIVE_HOURS)).isoformat()
     clusters = conn.execute(
-        "SELECT id, vector_sum, last_published_at FROM cluster "
+        "SELECT id, last_published_at FROM cluster "
         "WHERE model = ? AND country = ? AND last_published_at >= ?", (model, country, since)
     ).fetchall()
     stories = []
     for c in clusters:
         members = conn.execute(
-            "SELECT a.id, a.title, a.summary, a.url, a.image_url, a.published_at, f.name, e.vector "
+            "SELECT a.title, a.url, a.image_url, a.published_at, f.name, e.vector "
             "FROM cluster_member m JOIN article a ON a.id = m.article_id "
-            "JOIN feed f ON f.id = a.feed_id JOIN embedding e ON e.article_id = a.id "
-            "WHERE m.cluster_id = ? ORDER BY a.published_at DESC", (c["id"],)
+            "JOIN feed f ON f.id = a.feed_id JOIN embedding e ON e.article_id = a.id AND e.model = ? "
+            "WHERE m.cluster_id = ?", (model, c["id"])
         ).fetchall()
         if not members:
             continue
-        centroid = np.frombuffer(c["vector_sum"], dtype=np.float32)
-        centroid = centroid / (np.linalg.norm(centroid) or 1.0)
         vecs = np.stack([np.frombuffer(m["vector"], dtype=np.float32) for m in members])
-        sims = vecs @ centroid
-        best = members[int(np.argmax(sims))]
-        last = datetime.fromisoformat(c["last_published_at"])
+        published = [datetime.fromisoformat(m["published_at"]) for m in members]
+        best = pick_representative([m["title"] for m in members], vecs, published)
+        sims = vecs @ vecs[best]
+        order = sorted(range(len(members)), key=lambda i: (i != best, -float(sims[i])))
         sources = [
-            {"name": m["name"], "title": m["title"], "snippet": m["summary"], "url": m["url"],
-             "published_at": datetime.fromisoformat(m["published_at"]), "similarity": float(sim),
-             "article_id": m["id"], "image_url": m["image_url"]}
-            for m, sim in sorted(zip(members, sims), key=lambda t: t[1], reverse=True)
-        ]  # most representative first
-        outlets = len({m["name"] for m in members})
-        stories.append(Story(
-            cluster_id=c["id"], headline=best["title"], url=best["url"],
-            image_url=best["image_url"] or next((m["image_url"] for m in members if m["image_url"]), None),
-            updated_at=last, score=score(outlets, last, now), sources=sources,
-        ))
+            {"name": members[i]["name"], "title": members[i]["title"], "url": members[i]["url"],
+             "published_at": published[i], "similarity": float(sims[i]), "image_url": members[i]["image_url"]}
+            for i in order
+        ]
+        image = next((_web_url(s["image_url"]) for s in sources if _web_url(s["image_url"])), None)
+        last = datetime.fromisoformat(c["last_published_at"])
+        story = Story(
+            cluster_id=c["id"], headline=sources[0]["title"], url=_web_url(sources[0]["url"]),
+            source=sources[0]["name"], image_url=image, updated_at=last, score=0.0, sources=sources,
+        )
+        story.score = score(story.outlets, last, now)
+        stories.append(story)
     return stories
 
 
@@ -131,67 +122,8 @@ def ranked(stories: list[Story]) -> list[Story]:
 
 
 def top_stories(stories: list[Story]) -> list[Story]:
-    """The front page: ranked, without stories whose texts share no main event."""
-    return [s for s in ranked(stories) if not s.skip][:MAX_STORIES]
-
-
-def choose_image(conn: sqlite3.Connection, story: Story, text: str, model: str) -> str | None:
-    """The image of the article that best matches the final headline and lines.
-
-    The cluster's most representative article is not always the one the summary ended up being
-    about (a neighbouring topic can drag it), so match the summary itself. Only articles that tell
-    the main event are considered, falling back to any article with an image.
-    """
-    pool = [s for s in story.covered_sources if s.get("image_url")] or [s for s in story.sources if s.get("image_url")]
-    if not pool:
-        return None
-    if len(pool) == 1:
-        return pool[0]["image_url"]
-    ids = [s["article_id"] for s in pool if s.get("article_id")]
-    marks = ",".join("?" * len(ids))
-    vectors = {
-        r["article_id"]: np.frombuffer(r["vector"], dtype=np.float32)
-        for r in conn.execute(
-            f"SELECT article_id, vector FROM embedding WHERE model = ? AND article_id IN ({marks})", [model, *ids]
-        )
-    }
-    candidates = [s for s in pool if s.get("article_id") in vectors]
-    if not candidates:
-        return pool[0]["image_url"]
-    target = embed.encode([text], model)[0]  # once, not per candidate
-    return max(candidates, key=lambda s: float(vectors[s["article_id"]] @ target))["image_url"]
-
-
-def attach_summaries(
-    conn: sqlite3.Connection, stories: list[Story], now: datetime | None = None, model: str | None = None
-) -> None:
-    """Add the stored summary to each story and rank by the outlets that really cover it.
-
-    With `model`, also pick (once per summary, then cached in the database) the image that best
-    matches the summary.
-    """
-    now = now or datetime.now(UTC)
-    for s in stories:
-        row = conn.execute(
-            "SELECT headline, text, outlets, status, image_url FROM summary WHERE cluster_id = ?", (s.cluster_id,)
-        ).fetchone()
-        if not row:
-            continue
-        if row["status"] == "skip":
-            s.skip = True
-            continue
-        s.headline, s.summary = row["headline"], row["text"]
-        covering = json.loads(row["outlets"] or "[]")
-        if covering:  # older rows have none: keep every outlet of the cluster
-            s.covering = covering
-            s.score = score(s.outlets, s.updated_at, now)
-        if model:
-            if row["image_url"] is None:  # not chosen yet for this summary
-                chosen = choose_image(conn, s, f"{s.headline}. {' '.join(s.summary.split(chr(10)))}", model)
-                conn.execute("UPDATE summary SET image_url = ? WHERE cluster_id = ?", (chosen or "", s.cluster_id))
-                conn.commit()
-                row = {**dict(row), "image_url": chosen or ""}
-            s.image_url = row["image_url"] or s.image_url
+    """The front page: the most covered stories."""
+    return ranked(stories)[:MAX_STORIES]
 
 
 def _nav(countries: list[Country], current: Country, root: str) -> list[dict]:
@@ -234,7 +166,6 @@ def write_site(
     paths = []
     for i, country in enumerate(countries):
         stories = build_stories(conn, model, now, country.code)
-        attach_summaries(conn, stories, now, model)
         stories = top_stories(stories)
         home = i == 0
         html = render_page(stories, now, country, countries, root="" if home else "../")
