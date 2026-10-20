@@ -260,3 +260,26 @@ def test_last_attempt_over_length_still_fails_if_verification_fails():
                   "lines": ["una dos tres cuatro cinco seis siete ocho nueve diez once doce trece catorce", "Dos."]}
     with pytest.raises(UnverifiedSummary):
         summarize_story(FakeClient(drafts=[long_lines], verdicts=[["sin respaldo"]]), story())
+
+
+def test_digits_glued_to_letters_are_names_not_figures():
+    srcs = [{"name": "A", "title": "Cuatro muertos", "snippet": "balance de 4 fallecidos"}]
+    assert check_numbers("Dana", ["Cinco muertos según 20minutos", "Elecciones el 29N"], srcs) == []
+    assert check_numbers("Dana", ["Cinco muertos según 20 medios"], srcs)  # a bare number is still checked
+
+
+def test_a_failed_story_is_not_retried_until_the_cooldown_passes_or_the_cluster_grows(conn):
+    nothing_passes = FakeClient(verdicts=[["sin respaldo"]])
+    assert summarize_stories(conn, [story(n=3)], nothing_passes) == 1
+    assert conn.execute("SELECT COUNT(*) FROM summary_failure").fetchone()[0] == 1
+    again = FakeClient()
+    assert summarize_stories(conn, [story(n=3)], again) == 0 and again.gen_calls == 0   # cooling down
+    assert summarize_stories(conn, [story(n=9)], again) == 1                            # it grew: try again
+    assert conn.execute("SELECT COUNT(*) FROM summary_failure").fetchone()[0] == 0     # success clears it
+    assert conn.execute("SELECT COUNT(*) FROM summary").fetchone()[0] == 1
+
+
+def test_cooldown_expires(conn):
+    conn.execute("INSERT INTO summary_failure (cluster_id, n_members, failed_at, reason) "
+                 "VALUES (1, 3, '2020-01-01T00:00:00+00:00', 'x')")
+    assert summarize_stories(conn, [story(n=3)], FakeClient()) == 1
