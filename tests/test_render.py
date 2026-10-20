@@ -178,3 +178,45 @@ def test_paywalled_outlets_get_a_lock_where_they_are_named_and_others_do_not():
 
 def test_no_lock_when_nothing_is_paywalled():
     assert "🔒" not in render_page([story(1, 4, 1)], NOW, EN)
+
+
+# --- keeping world news out of an edition -----------------------------------------------------
+
+def test_excluded_stories_are_skipped_and_the_next_ones_fill_the_front_page():
+    stories = [story(i, 9 - i, 1) for i in range(1, 9)]       # 8..1 outlets: the last one never ranks
+    top = top_stories(stories, exclude=lambda s: s.cluster_id in (1, 2))
+    assert [s.cluster_id for s in top] == [3, 4, 5, 6, 7]
+
+
+def test_write_site_keeps_world_news_out_of_spain_but_in_international(tmp_path):
+    from agregador.render import write_site
+
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    OTHER = {"int": ("Foreign A", "Foreign B"), "es": ("Spanish A", "Spanish B")}
+
+    def add_cluster(cid, country, headline, section, vec):
+        conn.execute("INSERT INTO cluster (id, model, vector_sum, size, created_at, last_published_at, country) "
+                     "VALUES (?, 'm', x'00', 2, 'x', ?, ?)", (cid, NOW.isoformat(), country))
+        for n, outlet in enumerate(OTHER[country]):
+            conn.execute("INSERT OR IGNORE INTO feed (name, url, country) VALUES (?, ?, ?)", (outlet, f"f-{outlet}", country))
+            fid = conn.execute("SELECT id FROM feed WHERE name = ?", (outlet,)).fetchone()[0]
+            aid = cid * 10 + n
+            conn.execute("INSERT INTO article (id, feed_id, url, title, published_at, fetched_at) VALUES (?, ?, ?, ?, ?, 'x')",
+                         (aid, fid, f"https://{outlet.replace(' ', '')}.example/{section}/{aid}", headline,
+                          (NOW - timedelta(minutes=n)).isoformat()))
+            conn.execute("INSERT INTO embedding (article_id, model, vector) VALUES (?, 'm', ?)",
+                         (aid, np.array(vec, dtype=np.float32).tobytes()))
+            conn.execute("INSERT INTO cluster_member (article_id, cluster_id) VALUES (?, ?)", (aid, cid))
+
+    add_cluster(1, "int", "Trump meets Putin and Xi in China", "world", [1, 0.02])
+    add_cluster(2, "es", "Trump se reúne con Putin y Xi en China", "espana", [1, 0.03])          # same story, no section hint
+    add_cluster(3, "es", "Sánchez disuelve las Cortes y convoca elecciones", "espana", [0.1, 1])
+    add_cluster(4, "es", "Meloni envía militares a Milán", "internacional", [0.7, -0.7])          # world by URL section
+    int_c, es_c = Country("int", "International", "Europe/Madrid", "en"), Country("es", "Spain", "Europe/Madrid", "es", True)
+    write_site(conn, "m", tmp_path / "site", [int_c, es_c])
+    spain = (tmp_path / "site" / "es" / "index.html").read_text()
+    assert "Sánchez disuelve las Cortes" in spain
+    assert "Meloni envía militares" not in spain                       # excluded by the URL section
+    assert "Trump se reúne con Putin" not in spain                      # excluded: it is already in International
+    assert "Trump meets Putin and Xi in China" in (tmp_path / "site" / "index.html").read_text()

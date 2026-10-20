@@ -1,0 +1,31 @@
+date,headline,outlets,section_share,best_cos,shared,rule_foreign,is_foreign,uncertain,labeler
+2026-10-20,La dana Adam deja cuatro muertos y más de un millar de rescates en el Mediterráneo,16,0.000,0.880,0,0,0,0,model
+2026-10-20,La Policía carga contra los docentes madrileños en huelga para facilitar la salida de Ayuso de un acto,13,0.000,0.898,1,0,0,0,model
+2026-10-20,"Así es el 'contrato con España' de Feijóo: vivienda, pensiones e impuestos como protagonistas",12,0.000,0.863,0,0,0,0,model
+2026-10-20,Francia impone toques de queda parciales en París y otras ciudades ante la ola de violencia urbana,12,0.706,0.935,2,1,1,0,model
+2026-10-20,Mónica García renuncia a incorporarse a la lista de Frente Amplio para centrarse en las elecciones autonómicas,11,0.000,0.836,0,0,0,0,model
+2026-10-20,Abascal sopesa no concurrir en algunas provincias en el Senado tras el pacto del PSOE y Frente Amplio,11,0.000,0.865,0,0,0,0,model
+2026-10-20,El PP confirma que está negociando con Vox para blindar la mayoría de derecha en el Senado,11,0.000,0.854,0,0,0,0,model
+2026-10-20,Dimite en bloque toda la candidatura del PSOE en Palencia tras imponer Ferraz al cabeza de lista,12,0.000,0.846,0,0,0,0,model
+2026-10-20,"No fue Sánchez, fue la derecha",8,0.000,0.882,0,0,0,0,model
+2026-10-20,Mínima sanción para Cristiano Ronaldo: 30 días fuera y 255 euros tras su polémico abandono con Portugal,8,0.000,0.832,0,0,0,1,model
+2026-10-20,El juez Llarena critica al Constitucional pero confirma que Puigdemont puede volver a España sin ser detenido,10,0.000,0.854,1,0,0,0,model
+2026-10-20,Meloni envía 500 militares a Milán tras unos disturbios que conmocionan al país,8,0.875,0.887,0,1,1,0,model
+2026-10-20,Trump se muestra dispuesto a reunirse con Putin y Xi para negociar el fin de la guerra en Ucrania,7,1.000,0.942,4,1,1,0,model
+2026-10-20,La prima de riesgo francesa se dispara en plena oleada de disturbios y amenaza con desatar una crisis de deuda,7,0.143,0.916,2,0,1,0,model
+2026-10-20,Localizan muerto a un agricultor en la marjal de Pego-Oliva tras las inundaciones de la dana,6,0.000,0.852,0,0,0,0,model
+2026-10-20,El pleno del Constitucional decidirá mañana sobre la 'ley de nietos',7,0.000,0.840,1,0,0,0,model
+2026-10-20,"Bellerín denuncia por delitos de odio a Iñaki Angulo, el youtuber que le dirigió insultos homófobos",6,0.000,0.835,0,0,0,0,model
+2026-10-20,‘La Velada del Año’ cambia Twitch por Netflix: así será la nueva etapa del evento de Ibai Llanos,6,0.000,0.837,0,0,0,1,model
+2026-10-20,Cargas contra estudiantes en la protesta contra Vito Quiles en la Autònoma de Barcelona,6,0.000,0.878,0,0,0,0,model
+2026-10-20,La jueza cita a tres consejeros de Ceuta y pide a Defensa nuevos informes sobre la llegada masiva de migrantes,8,0.000,0.855,0,0,0,0,model
+2026-10-20,Una jueza de Florida ordena arrestar a Raúl Castro en plena presión sobre Cuba,8,0.625,0.862,0,1,1,0,model
+2026-10-20,Quién está comprando las casas del Pirineo aragonés mientras los precios suben y sus vecinos buscan vivienda,6,0.000,0.873,0,0,0,0,model
+2026-10-20,La Policía desaloja las acampadas por la vivienda en Lisboa y Oporto y detiene a varios manifestantes,5,0.800,0.879,0,1,1,0,model
+2026-10-20,"El coste de la vivienda empuja a 770.000 trabajadores a la pobreza, según Oxfam Intermón",5,0.000,0.866,0,0,0,0,model
+2026-10-20,El Rayo perdona con uno más en el estreno de Carvajal con el Getafe,5,0.000,0.825,0,0,0,0,model
+2026-10-20,Los ciudadanos de Alberta votan en referéndum permanecer en Canadá,5,0.800,0.937,3,1,1,0,model
+2026-10-20,Flick y Luis Enrique vuelven a cruzarse en una París convulsionada: un duelo de Champions con aroma a final,5,0.000,0.864,1,0,0,1,model
+2026-10-20,Este sería resultado de las elecciones del 29N en España si solo votasen los parados,5,0.000,0.837,1,0,0,0,model
+2026-10-20,Dimite el alcalde de Algeciras tras ser acusado de agresión sexual,7,0.000,0.830,0,0,0,0,model
+2026-10-20,Las parejas con hijos que acrediten dos años de convivencia podrán recibir la pensión de viudedad,4,0.000,0.859,0,0,0,0,model
