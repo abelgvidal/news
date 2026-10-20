@@ -17,6 +17,7 @@ if "--certain" in sys.argv:
     sys.argv.remove("--certain")
     pairs = [p for p in pairs if p["uncertain"] != "1"]
 models = sys.argv[1:] or [DEFAULT_MODEL]
+pairs = [p for p in pairs if int(p["article_a"]) in text and int(p["article_b"]) in text]  # purged articles are gone
 y = np.array([int(p["label"]) for p in pairs])
 
 for model in models:
