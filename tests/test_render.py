@@ -252,13 +252,15 @@ def test_the_cap_and_the_exclusion_work_together():
 
 # --- flags ----------------------------------------------------------------------------------------
 
-def test_an_edition_with_flags_shows_each_storys_flag_and_a_globe_when_there_is_no_single_country():
+def test_an_edition_with_flags_shows_the_flags_of_the_countries_involved_and_a_globe_for_none():
     flags_on = Country("int", "International", "Europe/Madrid", "en", show_flags=True)
     france = _about(1, 5, "France imposes curfews in Paris")
-    mixed = _about(2, 4, "Putin floats a summit with Trump and Xi to discuss Ukraine deal")
-    html = render_page([france, mixed], NOW, flags_on)
-    assert '<span class="flag" title="France"' in html and "🇫🇷" in html
-    assert '<span class="flag" title="Several countries, or none in particular"' in html and "🌐" in html
+    summit = _about(2, 4, "Putin floats a summit with Trump and Xi to discuss Ukraine deal")
+    none = _about(3, 3, "Possible wreckage of Amelia Earhart's plane likely to be trees")
+    html = render_page([france, summit, none], NOW, flags_on)
+    assert '<span class="flag" title="France" aria-label="France">🇫🇷</span>' in html
+    assert 'title="Ukraine, Russia, United States, China"' in html and "🇺🇦🇷🇺🇺🇸🇨🇳" in html   # heaviest first, ties by appearance
+    assert 'title="No country identified"' in html and "🌐" in html
 
 
 def test_an_edition_without_flags_shows_none():
