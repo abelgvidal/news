@@ -3,9 +3,15 @@ from datetime import UTC, datetime, timedelta
 import numpy as np
 import pytest
 
-from agregador.representative import centrality, headline_penalties, pick_representative
+from agregador.representative import (
+    centrality, choose_story, core_members, headline_penalties, title_overlap,
+)
 
 T0 = datetime(2026, 10, 19, 10, 0, tzinfo=UTC)
+
+
+def pick_representative(titles, vecs, published):
+    return choose_story(titles, vecs, published)[0]
 
 
 def unit(*xs):
@@ -68,3 +74,52 @@ def test_ties_go_to_the_article_published_first():
     vecs = np.stack([unit(1, 0.0), unit(1, 0.0)])
     assert pick_representative(["Primero", "Segundo"], vecs, [T0, T0 + timedelta(hours=2)]) == 0
     assert pick_representative(["Primero", "Segundo"], vecs, [T0 + timedelta(hours=2), T0]) == 1
+
+
+def test_a_penalty_never_pushes_the_choice_to_a_clearly_less_central_article():
+    # the plain headline drifts off the story: penalties must not rescue it from being passed over
+    vecs = np.stack([unit(1, 0.0), unit(1, 0.02), unit(1, 0.05), unit(0.6, 1)])
+    titles = ['"Cita" textual', "Plano uno", "Plano dos", "Plano lejano"]
+    best = pick_representative(titles, vecs, [T0] * 4)
+    assert best != 3 and best in (1, 2)
+
+
+def test_title_overlap_counts_shared_content_words_only():
+    assert title_overlap("Feijóo firma su contrato con España", "El contrato de Feijóo con España") > 0.4
+    assert title_overlap("La dana deja cuatro muertos", "Meloni envía 500 militares a Milán") == 0.0
+
+
+def test_core_keeps_the_story_and_drops_neighbouring_topics():
+    vecs = np.stack([unit(1, 0.0), unit(1, 0.05), unit(1, 0.9)])       # the last one is a different topic
+    titles = ["Meloni envía 500 militares a Milán", "Meloni despliega al Ejército en Milán", "Qué dice Francia de Europa"]
+    assert core_members(titles, vecs, 0) == [0, 1]
+
+
+def test_shared_words_rescue_a_borderline_article_that_embeddings_alone_would_drop():
+    vecs = np.stack([unit(1, 0.0), unit(1, 0.54)])                      # similarity ~0.88: under the 0.90 bar on its own
+    assert 0.87 < float(vecs[0] @ vecs[1]) < 0.89
+    rep = "Abascal ofrece al PP un pacto en el Senado"
+    assert core_members([rep, "Algo muy distinto aquí"], vecs, 0) == [0]
+    assert core_members([rep, "Pacto en el Senado: Abascal ofrece al PP candidatos"], vecs, 0) == [0, 1]
+
+
+def test_a_live_blog_that_is_the_most_central_still_loses_to_a_plain_headline_of_the_same_story():
+    vecs = np.stack([unit(1, 0.0), unit(1, 0.1), unit(1, -0.1)])      # the live blog sits right in the middle
+    titles = ["Milei, EN VIVO: todo sobre el discurso", "Milei habla en Neuquén ante empresarios", "Milei en la Expo de Neuquén"]
+    rep, core = choose_story(titles, vecs, [T0 + timedelta(hours=2), T0, T0 + timedelta(hours=1)])
+    assert rep == 1 and core == [0, 1, 2]
+
+
+def test_the_representative_always_belongs_to_the_core_and_drifted_articles_are_out():
+    vecs = np.stack([unit(1, 0.0), unit(1, 0.05), unit(1, 0.9)])
+    titles = ["Meloni envía 500 militares a Milán", "Meloni despliega al Ejército en Milán", "Qué dice Francia de Europa"]
+    rep, core = choose_story(titles, vecs, [T0] * 3)
+    assert rep in core and 2 not in core
+
+
+def test_a_penalty_never_picks_a_tangential_article_over_the_central_ones():
+    # every central headline carries a speech quote; the only plain one is clearly off to the side
+    vecs = np.stack([unit(1, 0.0), unit(1, 0.04), unit(1, -0.04), unit(1, 0.45)])
+    titles = ['Milei: "primera cita"', 'Milei: "segunda cita"', 'Milei: "tercera cita"', "Milei viajó a España"]
+    rep, core = choose_story(titles, vecs, [T0] * 4)
+    assert rep != 3        # the plain headline is not central enough to be a candidate

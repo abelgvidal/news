@@ -108,12 +108,23 @@ def test_the_story_is_the_most_central_article_with_its_own_headline_and_outlet(
     conn = _db_with_cluster(tmp_path, [
         ("A", "Titular central", _u(1, 0.02), None, 30),
         ("B", "Titular parecido", _u(1, 0.0), None, 20),
-        ("C", "Titular lejano", _u(0.4, 1), None, 10),
+        ("C", "Titular cercano", _u(1, 0.08), None, 10),
     ])
     (s,) = build_stories(conn, "m", NOW, "es")
     assert (s.headline, s.source, s.outlets) == ("Titular central", "A", 3)
-    assert s.sources[0]["name"] == "A" and s.sources[-1]["name"] == "C"      # representative first, outlier last
+    assert s.sources[0]["name"] == "A"                                    # representative first
     assert s.url == "https://A.example/1"
+
+
+def test_an_article_from_a_neighbouring_topic_is_left_out_of_the_story_and_of_the_count(tmp_path):
+    conn = _db_with_cluster(tmp_path, [
+        ("A", "Titular central", _u(1, 0.02), None, 30),
+        ("B", "Titular parecido", _u(1, 0.0), None, 20),
+        ("C", "Otro asunto distinto", _u(0.4, 1), None, 10),             # drifted into the cluster
+    ])
+    (s,) = build_stories(conn, "m", NOW, "es")
+    assert s.outlets == 2 and [x["name"] for x in s.sources] == ["A", "B"]
+    assert "C" not in [o["name"] for o in s.other_outlets]
 
 
 def test_a_quoted_headline_is_not_chosen_when_a_plain_one_is_as_good(tmp_path):
@@ -128,7 +139,7 @@ def test_the_image_is_the_representatives_or_the_closest_article_that_has_one(tm
     conn = _db_with_cluster(tmp_path, [
         ("A", "Central sin imagen", _u(1, 0.02), None, 30),
         ("B", "Cercano con imagen", _u(1, 0.0), "https://img.example/b.jpg", 20),
-        ("C", "Lejano con imagen", _u(0.4, 1), "https://img.example/c.jpg", 10),
+        ("C", "Cercano con imagen también", _u(1, 0.1), "https://img.example/c.jpg", 10),
     ])
     assert build_stories(conn, "m", NOW, "es")[0].image_url == "https://img.example/b.jpg"
     conn.execute("UPDATE article SET image_url = 'javascript:x' WHERE id = 2")

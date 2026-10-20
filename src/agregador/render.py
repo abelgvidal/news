@@ -12,7 +12,7 @@ import numpy as np
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from .config import Country
-from .representative import pick_representative
+from .representative import choose_story
 
 ACTIVE_HOURS = 48
 HALF_LIFE_HOURS = 24
@@ -97,9 +97,10 @@ def build_stories(
             continue
         vecs = np.stack([np.frombuffer(m["vector"], dtype=np.float32) for m in members])
         published = [datetime.fromisoformat(m["published_at"]) for m in members]
-        best = pick_representative([m["title"] for m in members], vecs, published)
+        titles = [m["title"] for m in members]
+        best, core = choose_story(titles, vecs, published)  # the cluster may hold neighbouring topics: keep the story
         sims = vecs @ vecs[best]
-        order = sorted(range(len(members)), key=lambda i: (i != best, -float(sims[i])))
+        order = sorted(core, key=lambda i: (i != best, -float(sims[i])))
         sources = [
             {"name": members[i]["name"], "title": members[i]["title"], "url": members[i]["url"],
              "published_at": published[i], "similarity": float(sims[i]), "image_url": members[i]["image_url"]}
