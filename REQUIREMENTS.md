@@ -68,7 +68,7 @@ A Spanish-language news aggregator. It collects articles from the RSS feeds of p
 - MR-3. **Clustering explainability**: a CLI command shows, for any article, its cluster, best similarity score, runner-up, and which guards fired.
 - MR-4. **Schema migrations**: numbered SQL migration files applied in order, with the schema version recorded in the DB.
 - MR-5. **Dependency pinning**: a lock file and a documented Python version.
-- MR-6. **Reproducible deploys**: systemd units, cron or timer, and web server config live in the repo, with a short setup procedure for a fresh Hetzner box.
+- MR-6. **Reproducible deploys**: systemd units, timers and web server config are code: they live in the `personal-infra` Ansible playbook `13-agregador.yml`, which sets up a fresh box.
 - MR-7. **Backups**: daily off-box copy of the SQLite file. Config, labeled pairs and fixtures live in git.
 - MR-8. **Modular stages**: `fetch`, `embed`, `cluster` and `render` are separate modules with plain-data interfaces, each testable and replaceable alone.
 - MR-9. **Normalization layer**: all feed-specific quirks (encodings, date formats, tracking params) are handled in one place.
