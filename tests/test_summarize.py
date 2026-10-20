@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -7,9 +8,9 @@ import pytest
 from agregador import db
 from agregador.render import Story
 from agregador.summarize import (
-    ESCALATION_MODEL, SUMMARY_MODEL, SUMMARY_TAG, UnverifiedSummary, Usage, VERIFY_MODEL, VERIFY_SYSTEM,
-    build_prompt, check_headline, check_lines, check_numbers, needs_refresh, parse_response, run_stats,
-    select_sources, summarize_stories, summarize_story,
+    ESCALATION_MODEL, NotAStory, SUMMARY_MODEL, SUMMARY_TAG, UnverifiedSummary, Usage, VERIFY_MODEL,
+    VERIFY_SYSTEM, build_prompt, check_coverage, check_headline, check_lines, check_numbers, needs_refresh,
+    parse_response, run_stats, select_sources, summarize_stories, summarize_story, valid_outlets,
 )
 
 NOW = datetime(2026, 10, 19, 12, 0, tzinfo=UTC)
@@ -39,9 +40,11 @@ class FakeClient:
             payload = {"problemas": self.verdicts[min(self.verify_calls, len(self.verdicts) - 1)]}
             self.verify_calls += 1
         else:
-            payload = self.drafts[min(self.gen_calls, len(self.drafts) - 1)]
+            prompt = kwargs["messages"][0]["content"]
+            payload = dict(self.drafts[min(self.gen_calls, len(self.drafts) - 1)])
+            payload.setdefault("outlets", re.findall(r"^- \[([^\]]+)\]", prompt, re.M))
             self.gen_calls += 1
-            self.prompts.append(kwargs["messages"][0]["content"])
+            self.prompts.append(prompt)
         block = SimpleNamespace(type="text", text=json.dumps(payload))
         return SimpleNamespace(stop_reason="end_turn", content=[block],
                                usage=SimpleNamespace(input_tokens=1000, output_tokens=100))
@@ -84,7 +87,8 @@ def test_needs_refresh_only_after_meaningful_growth():
 
 
 def test_parse_response_rejects_empty():
-    assert parse_response('{"headline": " A ", "lines": [" B ", ""]}') == ("A", ["B"])
+    assert parse_response('{"headline": " A ", "lines": [" B ", ""], "outlets": [" X "]}') == ("A", ["B"], ["X"])
+    assert parse_response('{"headline": "A", "lines": ["B"]}')[2] == []
     with pytest.raises(ValueError):
         parse_response('{"headline": "", "lines": ["B"]}')
 
@@ -138,9 +142,10 @@ def test_check_numbers_flags_invented_figures():
 
 def test_good_summary_costs_one_generation_and_one_verification():
     client = FakeClient()
-    headline, text = summarize_story(client, story())
+    headline, text, covering = summarize_story(client, story())
     assert (client.gen_calls, client.verify_calls) == (1, 1)
     assert headline == GOOD["headline"] and text.split("\n") == GOOD["lines"]
+    assert covering == ["M0", "M1", "M2"]
 
 
 def test_format_violation_retries_without_spending_a_verification_call():
@@ -155,7 +160,7 @@ def test_verifier_problems_are_fed_back_and_the_corrected_draft_is_kept():
     inverted = {"headline": "Cargas policiales frenan la salida de Ayuso", "lines": ["Una.", "Dos."]}
     client = FakeClient(drafts=[inverted, GOOD],
                         verdicts=[["la Policía carga para facilitar la salida, no para frenarla"], []])
-    headline, _ = summarize_story(client, story())
+    headline, _, _ = summarize_story(client, story())
     assert headline == GOOD["headline"]
     assert "facilitar la salida" in client.prompts[1]
 
@@ -244,7 +249,7 @@ def test_last_attempt_over_length_is_kept_when_verified():
     long_lines = {"headline": "Francia impone toques de queda en París",
                   "lines": ["una dos tres cuatro cinco seis siete ocho nueve diez once doce trece catorce", "Dos."]}
     client = FakeClient(drafts=[long_lines])  # every draft runs long; the verifier finds nothing wrong
-    headline, text = summarize_story(client, story())
+    headline, text, _ = summarize_story(client, story())
     assert headline == long_lines["headline"] and "catorce" in text
     assert client.gen_calls == 3 and client.verify_calls == 1  # only the last, tolerated draft is verified
 
@@ -283,3 +288,56 @@ def test_cooldown_expires(conn):
     conn.execute("INSERT INTO summary_failure (cluster_id, n_members, failed_at, reason) "
                  "VALUES (1, 3, '2020-01-01T00:00:00+00:00', 'x')")
     assert summarize_stories(conn, [story(n=3)], FakeClient()) == 1
+
+
+# --- main event and covering outlets ---------------------------------------------------------
+
+def test_valid_outlets_keeps_only_real_outlets_with_canonical_spelling():
+    assert valid_outlets(["el país", "Inventado", "El País", "ABC"], {"El País", "ABC", "COPE"}) == ["El País", "ABC"]
+
+
+def test_check_coverage_needs_three_outlets_and_half_of_those_seen():
+    assert check_coverage(["A", "B", "C"], 5) == []
+    assert check_coverage(["A", "B"], 2)                      # fewer than three
+    assert check_coverage(["A", "B", "C"], 8)                 # three of eight is a bag of topics
+
+
+def test_too_little_coverage_is_fed_back_and_a_better_draft_is_accepted():
+    narrow = {**GOOD, "outlets": ["M0"]}
+    client = FakeClient(drafts=[narrow, GOOD])
+    _, _, covering = summarize_story(client, story(n=4))
+    assert client.gen_calls == 2 and client.verify_calls == 1  # the narrow draft was never verified
+    assert "solo 1 de los 4 medios" in client.prompts[1] and covering == ["M0", "M1", "M2", "M3"]
+
+
+def test_a_bag_of_topics_is_not_a_story_and_costs_no_verification():
+    client = FakeClient(drafts=[{**GOOD, "outlets": ["M0"]}])
+    with pytest.raises(NotAStory):
+        summarize_story(client, story(n=6))
+    assert client.gen_calls == 3 and client.verify_calls == 0
+
+
+def test_not_a_story_is_stored_as_skipped_and_not_retried(conn):
+    client = FakeClient(drafts=[{**GOOD, "outlets": ["M0"]}])
+    assert summarize_stories(conn, [story(n=6)], client) == 1
+    row = conn.execute("SELECT status, headline FROM summary").fetchone()
+    assert (row["status"], row["headline"]) == ("skip", "")
+    assert summarize_stories(conn, [story(n=6)], client) == 0  # remembered, no new calls
+    assert conn.execute("SELECT skipped FROM summary_run").fetchone()[0] == 1
+
+
+def test_covering_outlets_are_stored(conn):
+    summarize_stories(conn, [story(n=4)], FakeClient())
+    assert json.loads(conn.execute("SELECT outlets FROM summary").fetchone()[0]) == ["M0", "M1", "M2", "M3"]
+
+
+def test_the_fill_target_stops_early_and_skipped_stories_do_not_count(conn):
+    for cid in range(2, 6):
+        conn.execute("INSERT INTO cluster (id, model, vector_sum, size, created_at, last_published_at) "
+                     "VALUES (?, 'm', x'00', 3, 'x', 'x')", (cid,))
+    skip_client = FakeClient(drafts=[{**GOOD, "outlets": ["M0"]}])
+    summarize_stories(conn, [story(cid=1, n=6)], skip_client)           # cluster 1 ends up skipped
+    client = FakeClient()
+    attempted = summarize_stories(conn, [story(cid=c, n=3) for c in range(1, 6)], client, target=2)
+    assert attempted == 2                                               # 2 and 3 fill the target of 2
+    assert conn.execute("SELECT COUNT(*) FROM summary WHERE status='ok'").fetchone()[0] == 2
