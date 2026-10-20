@@ -16,6 +16,8 @@ PLACE_WEIGHT = 1.0
 PERSON_WEIGHT = 0.5
 MIN_MENTIONS = 2.0
 MIN_SHARE = 0.5
+INVOLVED_SHARE = 0.15  # a country with this share of the weight is involved in the story (flag shown)
+MAX_INVOLVED = 4
 _US = re.compile(r"\bU\.S\.A?\.?|\bUSA\b|\bUS\b")  # case-sensitive: the pronoun "us" is not the country
 _UK = re.compile(r"\bU\.K\.?|\bUK\b")
 
@@ -56,10 +58,22 @@ def tally(titles: list[str]) -> Counter:
     pattern, terms = _dictionary()
     weight: Counter = Counter()
     for title in titles:
-        for term in set(pattern.findall(_fold(title))):
+        for term in dict.fromkeys(pattern.findall(_fold(title))):  # each term once per headline, in order of appearance
             country, w = terms[term]
             weight[country] += w
     return weight
+
+
+def involved_countries(titles: list[str]) -> list[str]:
+    """The countries a story involves: those holding at least INVOLVED_SHARE of the weight, heaviest first.
+
+    Ties keep the order in which the countries first appear. Empty when the headlines mention too few.
+    """
+    weight = tally(titles)
+    total = sum(weight.values())
+    if total < MIN_MENTIONS:
+        return []
+    return [c for c, w in weight.most_common() if w / total >= INVOLVED_SHARE][:MAX_INVOLVED]
 
 
 def primary_country(titles: list[str]) -> str | None:

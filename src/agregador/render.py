@@ -13,7 +13,7 @@ import numpy as np
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from .config import Country
-from .countries import flag, primary_country
+from .countries import flag, involved_countries, primary_country
 from .foreign import centroid, entity_stems, judge
 from .representative import choose_story
 
@@ -41,10 +41,10 @@ _MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "A
 LABELS = {
     "es": {"site": "News Aggregator", "outlets": "medios", "also_in": "También en", "more": "y {n} más",
            "dateline": "Lo más citado en los medios · actualizado a las", "paywall": "Puede requerir suscripción",
-           "empty": "Todavía no hay noticias agrupadas.", "several": "Varios países o ninguno en concreto"},
+           "empty": "Todavía no hay noticias agrupadas.", "no_country": "Sin país identificado"},
     "en": {"site": "News Aggregator", "outlets": "outlets", "also_in": "Also in", "more": "and {n} more",
            "dateline": "Most covered in the press · updated at", "paywall": "May require a subscription",
-           "empty": "No grouped stories yet.", "several": "Several countries, or none in particular"},
+           "empty": "No grouped stories yet.", "no_country": "No country identified"},
 }
 
 
@@ -81,9 +81,14 @@ class Story:
         return len({s["name"] for s in self.sources})
 
     @property
-    def flag(self) -> str:
-        """The flag of the country the story is about, or a globe when there is no single one."""
-        return flag(self.country)
+    def involved(self) -> list[str]:
+        """The countries the story involves, heaviest first (empty when the headlines name none)."""
+        return involved_countries([s["title"] for s in self.sources])
+
+    @property
+    def flags(self) -> str:
+        """The flags of the countries involved, or a globe when the headlines name none."""
+        return "".join(flag(c) for c in self.involved) or flag(None)
 
     @property
     def country(self) -> str | None:

@@ -59,3 +59,27 @@ def test_every_country_of_the_dictionary_has_a_two_letter_iso_code():
     bad = [name for name, entry in data.items() if len(entry.get("iso", "")) != 2 or not entry["iso"].isupper()]
     assert not bad
     assert len({entry["iso"] for entry in data.values()}) == len(data)          # no code used twice
+
+
+def test_involved_countries_are_those_with_a_real_share_of_the_weight_heaviest_first():
+    from agregador.countries import involved_countries
+
+    summit = ["Putin Floats a Summit With Trump and Xi to Discuss Ukraine Deal"]
+    assert involved_countries(summit) == ["Ukraine", "Russia", "United States", "China"]
+    assert involved_countries(["Trump Endorses Israel's Netanyahu for Re-Election"]) == ["Israel", "United States"]
+    assert involved_countries(["France imposes curfews in Paris"]) == ["France"]
+    assert involved_countries(["Possible wreckage of Amelia Earhart's plane"]) == []
+
+
+def test_a_country_mentioned_in_passing_is_not_involved():
+    from agregador.countries import involved_countries
+
+    titles = ["France faces reckoning after riots in Paris", "France in shock", "Paris shops looted",
+              "French cities calm", "Marseille town hall stormed", "Lyon clashes", "From Paris to Tirana, riots sweep Europe"]
+    assert involved_countries(titles) == ["France"]                    # Albania weighs well under 15 %
+
+
+def test_the_order_is_the_same_in_every_run():
+    from agregador.countries import tally
+
+    assert list(tally(["Putin, Trump and Xi meet in Beijing"])) == ["Russia", "United States", "China"]
