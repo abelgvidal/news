@@ -9,6 +9,7 @@ class FeedConfig:
     url: str
     country: str = "es"
     weight: float = 1.0
+    user_agent: str | None = None  # override for the few feeds whose firewall rejects our default one
 
 
 @dataclass(frozen=True)
