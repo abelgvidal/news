@@ -1,0 +1,333 @@
+# Which country a headline is about. Used to keep one story per country on an edition that asks for it
+# (max_per_country in feeds.toml). Terms are lowercase, without accents, matched as whole words.
+#   places: country name, demonym, capital, main cities, regions       -> weight 1.0 (a place does not travel)
+#   people: leaders and ministers                                      -> weight 0.5 (they appear in other countries' stories)
+# "US"/"U.S."/"USA" and "UK"/"U.K." are recognized in capitals by countries.py. Add what is missing.
+
+[France]
+places = ["france", "french", "paris", "marseille", "lyon", "lille", "limoges", "toulouse", "bordeaux", "elysee", "riviera"]
+people = ["macron", "lecornu"]
+
+[Italy]
+places = ["italy", "italian", "italians", "rome", "milan", "turin", "bologna", "naples", "venice"]
+people = ["meloni"]
+
+[Germany]
+places = ["germany", "german", "germans", "berlin", "munich", "bavaria", "hamburg", "frankfurt"]
+people = ["merz", "scholz"]
+
+[Spain]
+places = ["spain", "spanish", "madrid", "barcelona", "valencia", "alicante", "catalonia", "andalusia"]
+people = ["sanchez", "feijoo"]
+
+[Britain]
+places = ["britain", "british", "london", "england", "scotland", "wales", "northern ireland", "downing street", "westminster"]
+people = ["starmer"]
+
+["United States"]
+places = ["united states", "american", "americans", "white house", "pentagon", "congress", "senate", "california", "texas", "new york", "florida", "kansas", "midterms", "washington dc", "wall street", "cnn", "fbi"]
+people = ["trump", "hegseth", "vance", "rubio", "bessent", "biden", "obama"]
+
+[Canada]
+places = ["canada", "canadian", "canadians", "alberta", "ottawa", "toronto", "wainwright", "quebec", "vancouver"]
+people = ["carney"]
+
+[Russia]
+places = ["russia", "russian", "russians", "moscow", "kremlin"]
+people = ["putin", "lavrov"]
+
+[Ukraine]
+places = ["ukraine", "ukrainian", "ukrainians", "kyiv", "kiev", "donbas", "kharkiv", "odesa", "starshield"]
+people = ["zelensky", "zelenskyy", "zelenskiy"]
+
+[China]
+places = ["china", "chinese", "beijing", "shanghai", "hong kong", "shenzhen"]
+people = ["xi"]
+
+[Taiwan]
+places = ["taiwan", "taiwanese", "taipei"]
+people = []
+
+[Israel]
+places = ["israel", "israeli", "israelis", "jerusalem", "tel aviv", "knesset"]
+people = ["netanyahu"]
+
+[Palestine]
+places = ["gaza", "palestinian", "palestinians", "west bank", "hamas", "rafah", "ramallah"]
+people = []
+
+[Iran]
+places = ["iran", "iranian", "tehran"]
+people = []
+
+[Iraq]
+places = ["iraq", "iraqi", "baghdad"]
+people = []
+
+[Syria]
+places = ["syria", "syrian", "damascus", "aleppo"]
+people = []
+
+[Lebanon]
+places = ["lebanon", "lebanese", "beirut", "hezbollah"]
+people = []
+
+[Yemen]
+places = ["yemen", "yemeni", "houthi", "houthis", "sanaa", "aden"]
+people = []
+
+["Saudi Arabia"]
+places = ["saudi", "riyadh", "jeddah"]
+people = []
+
+[Qatar]
+places = ["qatar", "qatari", "doha"]
+people = []
+
+["United Arab Emirates"]
+places = ["emirates", "emirati", "dubai", "abu dhabi"]
+people = []
+
+[Turkey]
+places = ["turkey", "turkish", "ankara", "istanbul"]
+people = ["erdogan"]
+
+[Egypt]
+places = ["egypt", "egyptian", "cairo"]
+people = []
+
+[Jordan]
+places = ["jordanian", "amman"]
+people = []
+
+[India]
+places = ["india", "indian", "indians", "delhi", "mumbai", "kashmir", "bengaluru", "kolkata"]
+people = ["modi"]
+
+[Pakistan]
+places = ["pakistan", "pakistani", "islamabad", "karachi", "lahore"]
+people = []
+
+[Bangladesh]
+places = ["bangladesh", "bangladeshi", "dhaka"]
+people = []
+
+[Afghanistan]
+places = ["afghanistan", "afghan", "kabul", "taliban"]
+people = []
+
+["Sri Lanka"]
+places = ["sri lanka", "sri lankan", "colombo"]
+people = []
+
+[Nepal]
+places = ["nepal", "nepali", "kathmandu"]
+people = []
+
+[Japan]
+places = ["japan", "japanese", "tokyo", "osaka"]
+people = []
+
+["South Korea"]
+places = ["south korea", "south korean", "seoul"]
+people = []
+
+["North Korea"]
+places = ["north korea", "north korean", "pyongyang"]
+people = []
+
+[Indonesia]
+places = ["indonesia", "indonesian", "jakarta"]
+people = []
+
+[Philippines]
+places = ["philippines", "philippine", "filipino", "manila"]
+people = []
+
+[Vietnam]
+places = ["vietnam", "vietnamese", "hanoi"]
+people = []
+
+[Thailand]
+places = ["thailand", "thai", "bangkok"]
+people = []
+
+[Malaysia]
+places = ["malaysia", "malaysian", "kuala lumpur"]
+people = []
+
+[Singapore]
+places = ["singapore", "singaporean"]
+people = []
+
+[Myanmar]
+places = ["myanmar", "burma", "burmese", "yangon"]
+people = []
+
+[Australia]
+places = ["australia", "australian", "australians", "canberra", "sydney", "melbourne", "queensland"]
+people = ["haines", "albanese"]
+
+["New Zealand"]
+places = ["new zealand", "wellington", "auckland"]
+people = []
+
+[Brazil]
+places = ["brazil", "brazilian", "brazilians", "brasilia", "sao paulo", "rio de janeiro"]
+people = ["lula", "bolsonaro"]
+
+[Argentina]
+places = ["argentina", "argentine", "argentinian", "buenos aires"]
+people = ["milei"]
+
+[Mexico]
+places = ["mexico", "mexican", "mexicans"]
+people = ["sheinbaum"]
+
+[Colombia]
+places = ["colombia", "colombian", "colombians", "bogota", "medellin"]
+people = ["petro"]
+
+[Venezuela]
+places = ["venezuela", "venezuelan", "caracas"]
+people = ["maduro"]
+
+[Cuba]
+places = ["cuba", "cuban", "havana"]
+people = []
+
+[Chile]
+places = ["chile", "chilean"]
+people = []
+
+[Peru]
+places = ["peru", "peruvian", "lima"]
+people = []
+
+[Bolivia]
+places = ["bolivia", "bolivian"]
+people = []
+
+[Ecuador]
+places = ["ecuador", "ecuadorian", "quito"]
+people = []
+
+[Haiti]
+places = ["haiti", "haitian"]
+people = []
+
+[Kenya]
+places = ["kenya", "kenyan", "nairobi", "mombasa"]
+people = []
+
+["South Africa"]
+places = ["south africa", "south african", "johannesburg", "pretoria", "cape town"]
+people = []
+
+[Nigeria]
+places = ["nigeria", "nigerian", "lagos", "abuja"]
+people = []
+
+[Ethiopia]
+places = ["ethiopia", "ethiopian", "addis ababa"]
+people = []
+
+[Sudan]
+places = ["sudan", "sudanese", "khartoum"]
+people = []
+
+[Congo]
+places = ["congo", "congolese", "kinshasa"]
+people = []
+
+[Somalia]
+places = ["somalia", "somali", "mogadishu"]
+people = []
+
+[Morocco]
+places = ["morocco", "moroccan", "rabat"]
+people = []
+
+[Algeria]
+places = ["algeria", "algerian", "algiers"]
+people = []
+
+[Libya]
+places = ["libya", "libyan", "tripoli"]
+people = []
+
+[Poland]
+places = ["poland", "polish", "warsaw"]
+people = []
+
+[Netherlands]
+places = ["netherlands", "dutch", "amsterdam", "hague"]
+people = []
+
+[Belgium]
+places = ["belgium", "belgian", "brussels"]
+people = []
+
+[Greece]
+places = ["greece", "greek", "athens"]
+people = []
+
+[Albania]
+places = ["albania", "albanian", "tirana"]
+people = []
+
+[Serbia]
+places = ["serbia", "serbian", "belgrade"]
+people = []
+
+[Hungary]
+places = ["hungary", "hungarian", "budapest"]
+people = ["orban"]
+
+[Romania]
+places = ["romania", "romanian", "bucharest"]
+people = []
+
+[Switzerland]
+places = ["switzerland", "swiss", "zurich", "geneva"]
+people = []
+
+[Sweden]
+places = ["sweden", "swedish", "stockholm"]
+people = []
+
+[Norway]
+places = ["norway", "norwegian", "oslo"]
+people = []
+
+[Denmark]
+places = ["denmark", "danish", "copenhagen", "greenland"]
+people = []
+
+[Finland]
+places = ["finland", "finnish", "helsinki"]
+people = []
+
+[Ireland]
+places = ["ireland", "irish", "dublin"]
+people = []
+
+[Portugal]
+places = ["portugal", "portuguese", "lisbon", "porto"]
+people = []
+
+[Austria]
+places = ["austria", "austrian", "vienna"]
+people = []
+
+[Belarus]
+places = ["belarus", "belarusian", "minsk"]
+people = []
+
+[Georgia]
+places = ["tbilisi"]
+people = []
+
+[Kazakhstan]
+places = ["kazakhstan", "kazakh", "astana"]
+people = []

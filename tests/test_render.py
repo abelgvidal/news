@@ -220,3 +220,31 @@ def test_write_site_keeps_world_news_out_of_spain_but_in_international(tmp_path)
     assert "Meloni envía militares" not in spain                       # excluded by the URL section
     assert "Trump se reúne con Putin" not in spain                      # excluded: it is already in International
     assert "Trump meets Putin and Xi in China" in (tmp_path / "site" / "index.html").read_text()
+
+
+# --- at most N stories per country --------------------------------------------------------------
+
+def _about(cid, outlets, headline):
+    return story(cid, outlets, 1, headline=headline)
+
+
+def test_one_story_per_country_keeps_the_best_ranked_and_lets_the_next_ones_in():
+    stories = [
+        _about(1, 9, "Alberta voters reject separation from Canada"),
+        _about(2, 8, "France faces reckoning with policing after riots in Paris"),
+        _about(3, 8, "France imposes curfews in Paris and other cities"),
+        _about(4, 7, "Putin floats a summit with Trump and Xi to discuss Ukraine deal"),     # mixed: never limited
+        _about(5, 6, "Four Canadian service members killed in Alberta base fire"),
+        _about(6, 5, "Limoges town hall burns in French protests"),
+        _about(7, 4, "Japan launches mission to Mars moons from Tokyo"),
+    ]
+    assert [s.cluster_id for s in top_stories(stories, max_per_country=1)] == [1, 2, 4, 7]
+    assert [s.cluster_id for s in top_stories(stories, max_per_country=2)] == [1, 2, 3, 4, 5, 7]
+    assert len(top_stories(stories)) == 7                                              # no limit by default
+
+
+def test_the_cap_and_the_exclusion_work_together():
+    stories = [_about(1, 9, "France imposes curfews in Paris"), _about(2, 8, "France faces riots in Paris"),
+               _about(3, 7, "Japan launches mission from Tokyo")]
+    top = top_stories(stories, exclude=lambda s: s.cluster_id == 1, max_per_country=1)
+    assert [s.cluster_id for s in top] == [2, 3]
