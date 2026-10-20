@@ -79,7 +79,7 @@ def _upsert_feed(conn: sqlite3.Connection, feed: FeedConfig) -> sqlite3.Row:
 def fetch_feed(conn: sqlite3.Connection, client: httpx.Client, feed: FeedConfig) -> int:
     """Fetch one feed and store new articles. Returns the number inserted."""
     row = _upsert_feed(conn, feed)
-    headers = {}
+    headers = {"User-Agent": feed.user_agent} if feed.user_agent else {}
     if row["etag"]:
         headers["If-None-Match"] = row["etag"]
     if row["last_modified"]:

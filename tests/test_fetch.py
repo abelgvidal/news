@@ -21,3 +21,24 @@ def test_migrate_is_idempotent(tmp_path):
     v1 = db.migrate(conn)
     v2 = db.migrate(conn)
     assert v1 == v2 == len(list(db.MIGRATIONS_DIR.glob('*.sql')))
+
+
+def test_feed_user_agent_override_is_sent(tmp_path):
+    import httpx
+
+    from agregador.config import FeedConfig
+    from agregador.fetch import fetch_feed
+
+    seen = {}
+
+    def handler(request):
+        seen["ua"] = request.headers.get("user-agent")
+        return httpx.Response(200, content=FIXTURE.read_bytes())
+
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    client = httpx.Client(transport=httpx.MockTransport(handler), headers={"User-Agent": "default-agent"})
+    fetch_feed(conn, client, FeedConfig("A", "https://a.example/rss"))
+    assert seen["ua"] == "default-agent"
+    fetch_feed(conn, client, FeedConfig("B", "https://b.example/rss", user_agent="custom-agent"))
+    assert seen["ua"] == "custom-agent"
