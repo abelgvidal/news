@@ -2,332 +2,415 @@
 # (max_per_country in feeds.toml). Terms are lowercase, without accents, matched as whole words.
 #   places: country name, demonym, capital, main cities, regions       -> weight 1.0 (a place does not travel)
 #   people: leaders and ministers                                      -> weight 0.5 (they appear in other countries' stories)
+#   iso: ISO 3166-1 alpha-2 code, used to show the country's flag
 # "US"/"U.S."/"USA" and "UK"/"U.K." are recognized in capitals by countries.py. Add what is missing.
 
 [France]
+iso = "FR"
 places = ["france", "french", "paris", "marseille", "lyon", "lille", "limoges", "toulouse", "bordeaux", "elysee", "riviera"]
 people = ["macron", "lecornu"]
 
 [Italy]
+iso = "IT"
 places = ["italy", "italian", "italians", "rome", "milan", "turin", "bologna", "naples", "venice"]
 people = ["meloni"]
 
 [Germany]
+iso = "DE"
 places = ["germany", "german", "germans", "berlin", "munich", "bavaria", "hamburg", "frankfurt"]
 people = ["merz", "scholz"]
 
 [Spain]
+iso = "ES"
 places = ["spain", "spanish", "madrid", "barcelona", "valencia", "alicante", "catalonia", "andalusia"]
 people = ["sanchez", "feijoo"]
 
 [Britain]
+iso = "GB"
 places = ["britain", "british", "london", "england", "scotland", "wales", "northern ireland", "downing street", "westminster"]
 people = ["starmer"]
 
 ["United States"]
+iso = "US"
 places = ["united states", "american", "americans", "white house", "pentagon", "congress", "senate", "california", "texas", "new york", "florida", "kansas", "midterms", "washington dc", "wall street", "cnn", "fbi"]
 people = ["trump", "hegseth", "vance", "rubio", "bessent", "biden", "obama"]
 
 [Canada]
+iso = "CA"
 places = ["canada", "canadian", "canadians", "alberta", "ottawa", "toronto", "wainwright", "quebec", "vancouver"]
 people = ["carney"]
 
 [Russia]
+iso = "RU"
 places = ["russia", "russian", "russians", "moscow", "kremlin"]
 people = ["putin", "lavrov"]
 
 [Ukraine]
+iso = "UA"
 places = ["ukraine", "ukrainian", "ukrainians", "kyiv", "kiev", "donbas", "kharkiv", "odesa", "starshield"]
 people = ["zelensky", "zelenskyy", "zelenskiy"]
 
 [China]
+iso = "CN"
 places = ["china", "chinese", "beijing", "shanghai", "hong kong", "shenzhen"]
 people = ["xi"]
 
 [Taiwan]
+iso = "TW"
 places = ["taiwan", "taiwanese", "taipei"]
 people = []
 
 [Israel]
+iso = "IL"
 places = ["israel", "israeli", "israelis", "jerusalem", "tel aviv", "knesset"]
 people = ["netanyahu"]
 
 [Palestine]
+iso = "PS"
 places = ["gaza", "palestinian", "palestinians", "west bank", "hamas", "rafah", "ramallah"]
 people = []
 
 [Iran]
+iso = "IR"
 places = ["iran", "iranian", "tehran"]
 people = []
 
 [Iraq]
+iso = "IQ"
 places = ["iraq", "iraqi", "baghdad"]
 people = []
 
 [Syria]
+iso = "SY"
 places = ["syria", "syrian", "damascus", "aleppo"]
 people = []
 
 [Lebanon]
+iso = "LB"
 places = ["lebanon", "lebanese", "beirut", "hezbollah"]
 people = []
 
 [Yemen]
+iso = "YE"
 places = ["yemen", "yemeni", "houthi", "houthis", "sanaa", "aden"]
 people = []
 
 ["Saudi Arabia"]
+iso = "SA"
 places = ["saudi", "riyadh", "jeddah"]
 people = []
 
 [Qatar]
+iso = "QA"
 places = ["qatar", "qatari", "doha"]
 people = []
 
 ["United Arab Emirates"]
+iso = "AE"
 places = ["emirates", "emirati", "dubai", "abu dhabi"]
 people = []
 
 [Turkey]
+iso = "TR"
 places = ["turkey", "turkish", "ankara", "istanbul"]
 people = ["erdogan"]
 
 [Egypt]
+iso = "EG"
 places = ["egypt", "egyptian", "cairo"]
 people = []
 
 [Jordan]
+iso = "JO"
 places = ["jordanian", "amman"]
 people = []
 
 [India]
+iso = "IN"
 places = ["india", "indian", "indians", "delhi", "mumbai", "kashmir", "bengaluru", "kolkata"]
 people = ["modi"]
 
 [Pakistan]
+iso = "PK"
 places = ["pakistan", "pakistani", "islamabad", "karachi", "lahore"]
 people = []
 
 [Bangladesh]
+iso = "BD"
 places = ["bangladesh", "bangladeshi", "dhaka"]
 people = []
 
 [Afghanistan]
+iso = "AF"
 places = ["afghanistan", "afghan", "kabul", "taliban"]
 people = []
 
 ["Sri Lanka"]
+iso = "LK"
 places = ["sri lanka", "sri lankan", "colombo"]
 people = []
 
 [Nepal]
+iso = "NP"
 places = ["nepal", "nepali", "kathmandu"]
 people = []
 
 [Japan]
+iso = "JP"
 places = ["japan", "japanese", "tokyo", "osaka"]
 people = []
 
 ["South Korea"]
+iso = "KR"
 places = ["south korea", "south korean", "seoul"]
 people = []
 
 ["North Korea"]
+iso = "KP"
 places = ["north korea", "north korean", "pyongyang"]
 people = []
 
 [Indonesia]
+iso = "ID"
 places = ["indonesia", "indonesian", "jakarta"]
 people = []
 
 [Philippines]
+iso = "PH"
 places = ["philippines", "philippine", "filipino", "manila"]
 people = []
 
 [Vietnam]
+iso = "VN"
 places = ["vietnam", "vietnamese", "hanoi"]
 people = []
 
 [Thailand]
+iso = "TH"
 places = ["thailand", "thai", "bangkok"]
 people = []
 
 [Malaysia]
+iso = "MY"
 places = ["malaysia", "malaysian", "kuala lumpur"]
 people = []
 
 [Singapore]
+iso = "SG"
 places = ["singapore", "singaporean"]
 people = []
 
 [Myanmar]
+iso = "MM"
 places = ["myanmar", "burma", "burmese", "yangon"]
 people = []
 
 [Australia]
+iso = "AU"
 places = ["australia", "australian", "australians", "canberra", "sydney", "melbourne", "queensland"]
 people = ["haines", "albanese"]
 
 ["New Zealand"]
+iso = "NZ"
 places = ["new zealand", "wellington", "auckland"]
 people = []
 
 [Brazil]
+iso = "BR"
 places = ["brazil", "brazilian", "brazilians", "brasilia", "sao paulo", "rio de janeiro"]
 people = ["lula", "bolsonaro"]
 
 [Argentina]
+iso = "AR"
 places = ["argentina", "argentine", "argentinian", "buenos aires"]
 people = ["milei"]
 
 [Mexico]
+iso = "MX"
 places = ["mexico", "mexican", "mexicans"]
 people = ["sheinbaum"]
 
 [Colombia]
+iso = "CO"
 places = ["colombia", "colombian", "colombians", "bogota", "medellin"]
 people = ["petro"]
 
 [Venezuela]
+iso = "VE"
 places = ["venezuela", "venezuelan", "caracas"]
 people = ["maduro"]
 
 [Cuba]
+iso = "CU"
 places = ["cuba", "cuban", "havana"]
 people = []
 
 [Chile]
+iso = "CL"
 places = ["chile", "chilean"]
 people = []
 
 [Peru]
+iso = "PE"
 places = ["peru", "peruvian", "lima"]
 people = []
 
 [Bolivia]
+iso = "BO"
 places = ["bolivia", "bolivian"]
 people = []
 
 [Ecuador]
+iso = "EC"
 places = ["ecuador", "ecuadorian", "quito"]
 people = []
 
 [Haiti]
+iso = "HT"
 places = ["haiti", "haitian"]
 people = []
 
 [Kenya]
+iso = "KE"
 places = ["kenya", "kenyan", "nairobi", "mombasa"]
 people = []
 
 ["South Africa"]
+iso = "ZA"
 places = ["south africa", "south african", "johannesburg", "pretoria", "cape town"]
 people = []
 
 [Nigeria]
+iso = "NG"
 places = ["nigeria", "nigerian", "lagos", "abuja"]
 people = []
 
 [Ethiopia]
+iso = "ET"
 places = ["ethiopia", "ethiopian", "addis ababa"]
 people = []
 
 [Sudan]
+iso = "SD"
 places = ["sudan", "sudanese", "khartoum"]
 people = []
 
 [Congo]
+iso = "CD"
 places = ["congo", "congolese", "kinshasa"]
 people = []
 
 [Somalia]
+iso = "SO"
 places = ["somalia", "somali", "mogadishu"]
 people = []
 
 [Morocco]
+iso = "MA"
 places = ["morocco", "moroccan", "rabat"]
 people = []
 
 [Algeria]
+iso = "DZ"
 places = ["algeria", "algerian", "algiers"]
 people = []
 
 [Libya]
+iso = "LY"
 places = ["libya", "libyan", "tripoli"]
 people = []
 
 [Poland]
+iso = "PL"
 places = ["poland", "polish", "warsaw"]
 people = []
 
 [Netherlands]
+iso = "NL"
 places = ["netherlands", "dutch", "amsterdam", "hague"]
 people = []
 
 [Belgium]
+iso = "BE"
 places = ["belgium", "belgian", "brussels"]
 people = []
 
 [Greece]
+iso = "GR"
 places = ["greece", "greek", "athens"]
 people = []
 
 [Albania]
+iso = "AL"
 places = ["albania", "albanian", "tirana"]
 people = []
 
 [Serbia]
+iso = "RS"
 places = ["serbia", "serbian", "belgrade"]
 people = []
 
 [Hungary]
+iso = "HU"
 places = ["hungary", "hungarian", "budapest"]
 people = ["orban"]
 
 [Romania]
+iso = "RO"
 places = ["romania", "romanian", "bucharest"]
 people = []
 
 [Switzerland]
+iso = "CH"
 places = ["switzerland", "swiss", "zurich", "geneva"]
 people = []
 
 [Sweden]
+iso = "SE"
 places = ["sweden", "swedish", "stockholm"]
 people = []
 
 [Norway]
+iso = "NO"
 places = ["norway", "norwegian", "oslo"]
 people = []
 
 [Denmark]
+iso = "DK"
 places = ["denmark", "danish", "copenhagen", "greenland"]
 people = []
 
 [Finland]
+iso = "FI"
 places = ["finland", "finnish", "helsinki"]
 people = []
 
 [Ireland]
+iso = "IE"
 places = ["ireland", "irish", "dublin"]
 people = []
 
 [Portugal]
+iso = "PT"
 places = ["portugal", "portuguese", "lisbon", "porto"]
 people = []
 
 [Austria]
+iso = "AT"
 places = ["austria", "austrian", "vienna"]
 people = []
 
 [Belarus]
+iso = "BY"
 places = ["belarus", "belarusian", "minsk"]
 people = []
 
 [Georgia]
+iso = "GE"
 places = ["tbilisi"]
 people = []
 
 [Kazakhstan]
+iso = "KZ"
 places = ["kazakhstan", "kazakh", "astana"]
 people = []

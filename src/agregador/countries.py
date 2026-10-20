@@ -34,6 +34,18 @@ def _dictionary() -> tuple[re.Pattern, dict[str, tuple[str, float]]]:
     return pattern, terms
 
 
+@lru_cache(maxsize=1)
+def _iso_codes() -> dict[str, str]:
+    data = tomllib.loads((Path(__file__).parent / "countries.toml").read_text(encoding="utf-8"))
+    return {country: entry["iso"] for country, entry in data.items() if entry.get("iso")}
+
+
+def flag(country: str | None) -> str:
+    """The flag emoji of a country of countries.toml (two regional-indicator letters); the globe if unknown."""
+    code = _iso_codes().get(country or "")
+    return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in code) if code else "🌐"
+
+
 def _fold(title: str) -> str:
     title = _UK.sub(" britain ", _US.sub(" united states ", title))
     return unicodedata.normalize("NFKD", title.lower()).encode("ascii", "ignore").decode()

@@ -6,6 +6,7 @@ name = "International"
 tz = "Europe/Madrid"
 lang = "en"
 max_per_country = 1  # one story per country (a dictionary: see countries.py / countries.toml)
+show_flags = true  # the flag of each story's country (a globe when it mixes several)
 
 [[country]]
 code = "es"

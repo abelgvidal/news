@@ -40,3 +40,22 @@ def test_a_story_about_one_country_that_mentions_another_keeps_its_own():
 
 def test_all_the_headlines_of_a_story_vote_together():
     assert primary_country(["Rioting sweeps the nation", "France in shock", "Paris shops looted"]) == "France"
+
+
+def test_the_flag_is_made_from_the_iso_code_and_unknown_countries_get_a_globe():
+    from agregador.countries import flag
+
+    assert flag("France") == "🇫🇷" and flag("United States") == "🇺🇸" and flag("Britain") == "🇬🇧"
+    assert flag(None) == "🌐" and flag("Atlantis") == "🌐"
+
+
+def test_every_country_of_the_dictionary_has_a_two_letter_iso_code():
+    import tomllib
+    from pathlib import Path
+
+    import agregador.countries as c
+
+    data = tomllib.loads((Path(c.__file__).parent / "countries.toml").read_text(encoding="utf-8"))
+    bad = [name for name, entry in data.items() if len(entry.get("iso", "")) != 2 or not entry["iso"].isupper()]
+    assert not bad
+    assert len({entry["iso"] for entry in data.values()}) == len(data)          # no code used twice

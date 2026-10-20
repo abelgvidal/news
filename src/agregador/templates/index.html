@@ -44,6 +44,7 @@
   .lead img { aspect-ratio:3/2; }
   .story h2 a { color:inherit; text-decoration:none; }
   .story h2 a:hover { color:var(--accent); }
+  .flag { font-size:1.35em; line-height:1; vertical-align:-0.12em; margin-right:.2em; font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif; }
   .lock { font-size:.72em; text-decoration:none; }
   .source { margin:0 0 8px; font: 600 0.8rem system-ui, sans-serif; color:var(--muted); }
   .outlets { margin:0; font: 0.8rem/1.4 system-ui, sans-serif; color:var(--muted); }
@@ -88,7 +89,7 @@
 {% macro story(s, kicker=true, img=true) %}
   <article class="story">
     {% if img and s.image_url %}<img src="{{ s.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
-    {% if kicker %}<div class="kicker">{{ s.outlets }} {{ L.outlets }} · {{ hora(s.updated_at) }}</div>{% endif %}
+    {% if kicker %}<div class="kicker">{% if country.show_flags %}<span class="flag" title="{{ s.country or L.several }}" aria-label="{{ s.country or L.several }}">{{ s.flag }}</span> {% endif %}{{ s.outlets }} {{ L.outlets }} · {{ hora(s.updated_at) }}</div>{% endif %}
     <h2>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ s.headline }}</a>{% else %}{{ s.headline }}{% endif %}</h2>
     <p class="source">{{ s.source }}{% if s.source_paywall %} <span class="lock" title="{{ L.paywall }}" aria-label="{{ L.paywall }}">🔒</span>{% endif %}</p>
     {% set links = s.other_outlets %}
