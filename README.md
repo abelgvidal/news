@@ -67,10 +67,10 @@ Story images are downloaded once per edition, shrunk to WebP thumbnails, and cre
 
 Collection and publishing are separate on purpose. Many feeds only keep the last few hours (half of them do not reach back 24 hours), so collecting once a day would miss most of the news.
 
-- `agregador fetch` every 15 minutes: light, no model loaded.
+- `agregador fetch` every hour, at minute 51: light, no model loaded.
 - `agregador run` + `agregador edition` once a day at 07:00 Madrid time.
 
-The timers are two systemd units: the 15-minute `fetch` (a `oneshot` service run by `OnUnitActiveSec=15min`) and the daily edition (`OnCalendar=*-*-* 07:00:00 Europe/Madrid`, which runs `run` and then `edition`). State (the SQLite database) is cheap to lose; the published editions are not, because feeds forget. Back those up.
+The timers are two systemd units: the hourly `fetch` (a `oneshot` service, `OnCalendar=*-*-* *:51:00`) and the daily edition (`OnCalendar=*-*-* 07:00:00 Europe/Madrid`, which runs `run` and then `edition`). State (the SQLite database) is cheap to lose; the published editions are not, because feeds forget. Back those up.
 
 ## Layout
 
