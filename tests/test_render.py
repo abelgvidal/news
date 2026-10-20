@@ -99,3 +99,88 @@ def test_ranking_uses_the_honest_count_and_skipped_stories_never_appear(tmp_path
     top = top_stories(stories)
     assert [s.headline for s in top] == ["Cubre cuatro", "Cubre dos"]   # 4 outlets beats 2; the skipped one is gone
     assert [s.outlets for s in top] == [4, 2]
+
+
+# --- image chosen by the final summary -------------------------------------------------------
+
+def _image_db(tmp_path):
+    import numpy as np
+
+    from agregador import db
+
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    conn.execute("INSERT INTO feed (id, name, url) VALUES (1, 'A', 'a')")
+    conn.execute("INSERT INTO cluster (id, model, vector_sum, size, created_at, last_published_at) "
+                 "VALUES (1, 'm', x'00', 3, 'x', 'x')")
+    vecs = {1: [1.0, 0.0], 2: [0.0, 1.0], 3: [0.6, 0.8]}  # article 1 is the one about the story
+    for aid, v in vecs.items():
+        conn.execute("INSERT INTO article (id, feed_id, url, title, published_at, fetched_at) "
+                     "VALUES (?, 1, ?, 't', 'x', 'x')", (aid, f"https://e.com/{aid}"))
+        conn.execute("INSERT INTO embedding (article_id, model, vector) VALUES (?, 'm', ?)",
+                     (aid, np.array(v, dtype=np.float32).tobytes()))
+    conn.execute("INSERT INTO summary (cluster_id, model, n_members, headline, text, created_at, outlets, status) "
+                 "VALUES (1, 'x', 3, 'Titular final', 'a\nb', 'x', '[]', 'ok')")
+    return conn
+
+
+def _story_with_images():
+    s = story(1, 3, 1)
+    for i, src in enumerate(s.sources, 1):
+        src["article_id"], src["image_url"] = i, f"https://img.example/{i}.jpg"
+    s.sources[0]["name"], s.sources[1]["name"], s.sources[2]["name"] = "M0", "M1", "M2"
+    return s
+
+
+def test_the_image_comes_from_the_article_closest_to_the_final_summary(tmp_path, monkeypatch):
+    import numpy as np
+
+    from agregador.render import attach_summaries
+
+    conn = _image_db(tmp_path)
+    monkeypatch.setattr("agregador.embed.encode", lambda texts, model: np.array([[0.0, 1.0]], dtype=np.float32))
+    s = _story_with_images()
+    s.image_url = "https://img.example/1.jpg"          # what the cluster centroid would have picked
+    attach_summaries(conn, [s], NOW, "m")
+    assert s.image_url == "https://img.example/2.jpg"  # article 2 matches the summary vector
+
+
+def test_the_chosen_image_is_cached_and_recomputed_only_for_a_new_summary(tmp_path, monkeypatch):
+    import numpy as np
+
+    from agregador.render import attach_summaries
+
+    conn = _image_db(tmp_path)
+    calls = []
+    monkeypatch.setattr("agregador.embed.encode",
+                        lambda texts, model: calls.append(1) or np.array([[0.0, 1.0]], dtype=np.float32))
+    attach_summaries(conn, [_story_with_images()], NOW, "m")
+    attach_summaries(conn, [_story_with_images()], NOW, "m")
+    assert len(calls) == 1 and conn.execute("SELECT image_url FROM summary").fetchone()[0].endswith("2.jpg")
+    conn.execute("UPDATE summary SET image_url = NULL")    # what a regenerated summary starts with
+    attach_summaries(conn, [_story_with_images()], NOW, "m")
+    assert len(calls) == 2
+
+
+def test_only_articles_that_cover_the_event_can_lend_their_image(tmp_path, monkeypatch):
+    import numpy as np
+
+    from agregador.render import attach_summaries
+
+    conn = _image_db(tmp_path)
+    monkeypatch.setattr("agregador.embed.encode", lambda texts, model: np.array([[0.0, 1.0]], dtype=np.float32))
+    conn.execute("UPDATE summary SET outlets = '[\"M0\", \"M2\"]'")   # M1, the best match, does not cover it
+    s = _story_with_images()
+    attach_summaries(conn, [s], NOW, "m")
+    assert s.image_url == "https://img.example/3.jpg"                     # best among M0 and M2
+
+
+def test_a_story_without_any_image_keeps_none_and_does_not_break(tmp_path, monkeypatch):
+    from agregador.render import attach_summaries
+
+    conn = _image_db(tmp_path)
+    monkeypatch.setattr("agregador.embed.encode", lambda *a: (_ for _ in ()).throw(AssertionError("not needed")))
+    s = story(1, 3, 1)
+    s.image_url = None
+    attach_summaries(conn, [s], NOW, "m")
+    assert s.image_url is None and conn.execute("SELECT image_url FROM summary").fetchone()[0] == ""
