@@ -3,6 +3,8 @@ name = "agregador"
 version = "0.1.0"
 description = "Spanish news aggregator with story clustering"
 requires-python = ">=3.12"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
 dependencies = [
     "feedparser>=6.0",
     "httpx>=0.27",
