@@ -82,15 +82,18 @@ SCHEMA = {
 
 VERIFY_SYSTEM = (
     "Eres el verificador de un servicio de noticias. Recibes los textos de varios medios sobre una noticia y un "
-    "titular con dos líneas escritos a partir de ellos. Comprueba cada afirmación contra los textos.\n"
-    "Lista como problema solo lo que sea un error real y confirmado:\n"
+    "titular con dos líneas escritos a partir de ellos. Comprueba cada afirmación contra los textos y clasifica "
+    "cada problema por gravedad.\n"
+    "GRAVE (el lector saldría con una idea falsa):\n"
     "- afirmación o cifra que los textos no respaldan;\n"
     "- afirmación que contradice o invierte lo que dicen los textos (p. ej. quién hace qué a quién);\n"
     "- atribución errónea (a otra persona, medio o institución);\n"
     "- previsión, proyección o promesa presentada como hecho ya ocurrido;\n"
     "- causa o consecuencia que los textos no establecen;\n"
-    "- alcance mal dado (p. ej. una cifra de toda una región atribuida a una sola ciudad);\n"
     "- titular sin sujeto explícito (empieza directamente por un verbo sin decir quién actúa).\n"
+    "MENOR (impreciso pero no engañoso): alcance geográfico o temporal algo impreciso (una región o una ciudad "
+    "donde los textos dan un ámbito más amplio o más estrecho), cifras redondeadas o una versión elegida entre "
+    "varias cercanas, matices de redacción.\n"
     "Reglas para no exagerar: si al analizar una afirmación concluyes que está respaldada o que no es un problema, "
     "NO la incluyas. Si hay duda razonable, no la marques. No marques estilo ni longitud. Describir el contenido de "
     "un compromiso, plan o propuesta atribuido a quien lo hace (p. ej. 'firma un contrato con doce compromisos: "
@@ -99,7 +102,20 @@ VERIFY_SYSTEM = (
 )
 VERIFY_SCHEMA = {
     "type": "object",
-    "properties": {"problemas": {"type": "array", "items": {"type": "string"}}},
+    "properties": {
+        "problemas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "gravedad": {"type": "string", "enum": ["grave", "menor"]},
+                    "descripcion": {"type": "string"},
+                },
+                "required": ["gravedad", "descripcion"],
+                "additionalProperties": False,
+            },
+        }
+    },
     "required": ["problemas"],
     "additionalProperties": False,
 }
@@ -301,13 +317,18 @@ def _ask(client, model: str, system: str, prompt: str, schema: dict, usage: Usag
     return next(b.text for b in response.content if b.type == "text")
 
 
-def verify(client, story: Story, headline: str, lines: list[str], usage: Usage | None = None) -> list[str]:
-    """Ask the verifier model to check every claim against the sources; returns the problems found."""
+def verify(
+    client, story: Story, headline: str, lines: list[str], usage: Usage | None = None
+) -> list[tuple[str, str]]:
+    """Ask the verifier model to check every claim against the sources.
+
+    Returns (severity, description) pairs: "grave" misleads the reader, "menor" is an imprecision.
+    """
     usage = usage or Usage()
     usage.verify_calls += 1
     prompt = f"{build_prompt(story)}\n\nTitular: {headline}\nLíneas:\n" + "\n".join(f"- {ln}" for ln in lines)
     raw = _ask(client, VERIFY_MODEL, VERIFY_SYSTEM, prompt, VERIFY_SCHEMA, usage)
-    return [str(p) for p in json.loads(raw)["problemas"]]
+    return [(str(p["gravedad"]), str(p["descripcion"])) for p in json.loads(raw)["problemas"]]
 
 
 def summarize_story(client, story: Story, usage: Usage | None = None) -> tuple[str, str, list[str]]:
@@ -341,12 +362,14 @@ def summarize_story(client, story: Story, usage: Usage | None = None) -> tuple[s
         blocking = [p for p in problems if _LENGTH_HINT not in p] if attempt == MAX_ATTEMPTS else problems
         if not blocking:
             verdict = verify(client, story, headline, lines, usage)
-            if not verdict:
-                if problems:
-                    log.info("cluster %s: kept over the length limit after verification (%s)",
-                             story.cluster_id, "; ".join(problems))
+            serious = [text for severity, text in verdict if severity == "grave"]
+            if not serious:
+                # Imprecisions (scope, rounding) are not worth losing a story over: keep it and note them.
+                notes = problems + [f"menor: {text}" for _, text in verdict]
+                if notes:
+                    log.info("cluster %s: accepted with notes (%s)", story.cluster_id, "; ".join(notes))
                 return headline, "\n".join(lines), covering
-            problems = verdict
+            problems = serious
         prompt = (
             f"{base}\n\nTu versión anterior (titular: '{headline}'; líneas: {lines}; medios: {covering}) no es "
             f"válida: {'; '.join(problems)}. Escríbela de nuevo corrigiendo todos los problemas."

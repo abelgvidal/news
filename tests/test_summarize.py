@@ -37,7 +37,8 @@ class FakeClient:
             raise RuntimeError("boom")
         self.models.append(kwargs["model"])
         if kwargs["system"] == VERIFY_SYSTEM:
-            payload = {"problemas": self.verdicts[min(self.verify_calls, len(self.verdicts) - 1)]}
+            raw = self.verdicts[min(self.verify_calls, len(self.verdicts) - 1)]
+            payload = {"problemas": [p if isinstance(p, dict) else {"gravedad": "grave", "descripcion": p} for p in raw]}
             self.verify_calls += 1
         else:
             prompt = kwargs["messages"][0]["content"]
@@ -341,3 +342,21 @@ def test_the_fill_target_stops_early_and_skipped_stories_do_not_count(conn):
     attempted = summarize_stories(conn, [story(cid=c, n=3) for c in range(1, 6)], client, target=2)
     assert attempted == 2                                               # 2 and 3 fill the target of 2
     assert conn.execute("SELECT COUNT(*) FROM summary WHERE status='ok'").fetchone()[0] == 2
+
+
+# --- severity ---------------------------------------------------------------------------------
+
+MINOR = {"gravedad": "menor", "descripcion": "alcance impreciso: la cifra es de toda España, no de Valencia"}
+
+
+def test_a_minor_imprecision_does_not_cost_the_story_nor_a_retry():
+    client = FakeClient(verdicts=[[MINOR]])
+    headline, _, _ = summarize_story(client, story())
+    assert headline == GOOD["headline"] and (client.gen_calls, client.verify_calls) == (1, 1)
+
+
+def test_a_serious_problem_next_to_a_minor_one_still_forces_a_correction():
+    client = FakeClient(verdicts=[[MINOR, "la cifra no está en los textos"], []])
+    summarize_story(client, story())
+    assert client.gen_calls == 2
+    assert "la cifra no está en los textos" in client.prompts[1] and "alcance impreciso" not in client.prompts[1]
