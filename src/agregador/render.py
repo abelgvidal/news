@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 from jinja2 import Environment, PackageLoader, select_autoescape
 
+from . import embed
 from .config import Country
 
 ACTIVE_HOURS = 48
@@ -96,7 +97,7 @@ def build_stories(
     stories = []
     for c in clusters:
         members = conn.execute(
-            "SELECT a.title, a.summary, a.url, a.image_url, a.published_at, f.name, e.vector "
+            "SELECT a.id, a.title, a.summary, a.url, a.image_url, a.published_at, f.name, e.vector "
             "FROM cluster_member m JOIN article a ON a.id = m.article_id "
             "JOIN feed f ON f.id = a.feed_id JOIN embedding e ON e.article_id = a.id "
             "WHERE m.cluster_id = ? ORDER BY a.published_at DESC", (c["id"],)
@@ -111,7 +112,8 @@ def build_stories(
         last = datetime.fromisoformat(c["last_published_at"])
         sources = [
             {"name": m["name"], "title": m["title"], "snippet": m["summary"], "url": m["url"],
-             "published_at": datetime.fromisoformat(m["published_at"]), "similarity": float(sim)}
+             "published_at": datetime.fromisoformat(m["published_at"]), "similarity": float(sim),
+             "article_id": m["id"], "image_url": m["image_url"]}
             for m, sim in sorted(zip(members, sims), key=lambda t: t[1], reverse=True)
         ]  # most representative first
         outlets = len({m["name"] for m in members})
@@ -133,12 +135,45 @@ def top_stories(stories: list[Story]) -> list[Story]:
     return [s for s in ranked(stories) if not s.skip][:MAX_STORIES]
 
 
-def attach_summaries(conn: sqlite3.Connection, stories: list[Story], now: datetime | None = None) -> None:
-    """Add the stored summary to each story and rank by the outlets that really cover it."""
+def choose_image(conn: sqlite3.Connection, story: Story, text: str, model: str) -> str | None:
+    """The image of the article that best matches the final headline and lines.
+
+    The cluster's most representative article is not always the one the summary ended up being
+    about (a neighbouring topic can drag it), so match the summary itself. Only articles that tell
+    the main event are considered, falling back to any article with an image.
+    """
+    pool = [s for s in story.covered_sources if s.get("image_url")] or [s for s in story.sources if s.get("image_url")]
+    if not pool:
+        return None
+    if len(pool) == 1:
+        return pool[0]["image_url"]
+    ids = [s["article_id"] for s in pool if s.get("article_id")]
+    marks = ",".join("?" * len(ids))
+    vectors = {
+        r["article_id"]: np.frombuffer(r["vector"], dtype=np.float32)
+        for r in conn.execute(
+            f"SELECT article_id, vector FROM embedding WHERE model = ? AND article_id IN ({marks})", [model, *ids]
+        )
+    }
+    candidates = [s for s in pool if s.get("article_id") in vectors]
+    if not candidates:
+        return pool[0]["image_url"]
+    target = embed.encode([text], model)[0]  # once, not per candidate
+    return max(candidates, key=lambda s: float(vectors[s["article_id"]] @ target))["image_url"]
+
+
+def attach_summaries(
+    conn: sqlite3.Connection, stories: list[Story], now: datetime | None = None, model: str | None = None
+) -> None:
+    """Add the stored summary to each story and rank by the outlets that really cover it.
+
+    With `model`, also pick (once per summary, then cached in the database) the image that best
+    matches the summary.
+    """
     now = now or datetime.now(UTC)
     for s in stories:
         row = conn.execute(
-            "SELECT headline, text, outlets, status FROM summary WHERE cluster_id = ?", (s.cluster_id,)
+            "SELECT headline, text, outlets, status, image_url FROM summary WHERE cluster_id = ?", (s.cluster_id,)
         ).fetchone()
         if not row:
             continue
@@ -150,6 +185,13 @@ def attach_summaries(conn: sqlite3.Connection, stories: list[Story], now: dateti
         if covering:  # older rows have none: keep every outlet of the cluster
             s.covering = covering
             s.score = score(s.outlets, s.updated_at, now)
+        if model:
+            if row["image_url"] is None:  # not chosen yet for this summary
+                chosen = choose_image(conn, s, f"{s.headline}. {' '.join(s.summary.split(chr(10)))}", model)
+                conn.execute("UPDATE summary SET image_url = ? WHERE cluster_id = ?", (chosen or "", s.cluster_id))
+                conn.commit()
+                row = {**dict(row), "image_url": chosen or ""}
+            s.image_url = row["image_url"] or s.image_url
 
 
 def _nav(countries: list[Country], current: Country, root: str) -> list[dict]:
@@ -192,7 +234,7 @@ def write_site(
     paths = []
     for i, country in enumerate(countries):
         stories = build_stories(conn, model, now, country.code)
-        attach_summaries(conn, stories, now)
+        attach_summaries(conn, stories, now, model)
         stories = top_stories(stories)
         home = i == 0
         html = render_page(stories, now, country, countries, root="" if home else "../")
