@@ -360,3 +360,16 @@ def test_a_serious_problem_next_to_a_minor_one_still_forces_a_correction():
     summarize_story(client, story())
     assert client.gen_calls == 2
     assert "la cifra no está en los textos" in client.prompts[1] and "alcance impreciso" not in client.prompts[1]
+
+
+def test_the_prompts_carry_the_attribution_rules():
+    from agregador.summarize import SYSTEM
+
+    assert "SOLO si los textos lo dan por cierto" in SYSTEM and "lleva siempre su autor" in SYSTEM
+    assert "solo presentan como dicho por el protagonista" in VERIFY_SYSTEM
+
+
+def test_the_format_version_changed_so_old_summaries_are_rebuilt(conn):
+    conn.execute("INSERT INTO summary (cluster_id, model, n_members, headline, text, created_at) "
+                 "VALUES (1, 'claude-haiku-5-5/telegraphic-3', 3, 'old', 'old', 'x')")
+    assert summarize_stories(conn, [story()], FakeClient()) == 1
