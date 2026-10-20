@@ -1,6 +1,8 @@
 """Merge your decisions from the review file back into tests/labeled_clusters.csv.
 
-    uv run python scripts/apply_review.py data/revisar_dudosos.csv
+    uv run python scripts/apply_review.py data/revisar_dudosos.csv [tests/labeled_clusters_int.csv]
+
+The optional second argument picks the labeled set (default: the Spanish one).
 
 In the review file, fill the column `tu_decision` (the column "mi etiqueta" is only the model's opinion and is
 never read): "si" or "no" for whether the article belongs to the story, or "ok" to confirm the model's label.
@@ -15,7 +17,8 @@ fold = lambda t: unicodedata.normalize("NFKD", t.strip().lower()).encode("ascii"
 YES, NO, OK = {"si", "s", "1", "yes", "y"}, {"no", "n", "0"}, {"ok", "="}
 
 review = {r["article_id"]: fold(r["tu_decision"]) for r in csv.DictReader(open(path)) if r["tu_decision"].strip()}
-rows = list(csv.DictReader(open("tests/labeled_clusters.csv")))
+labels = sys.argv[2] if len(sys.argv) > 2 else "tests/labeled_clusters.csv"
+rows = list(csv.DictReader(open(labels)))
 changed = flipped = 0
 unknown = [v for v in review.values() if v not in YES | NO | OK]
 if unknown:
@@ -28,9 +31,9 @@ for r in rows:
     flipped += new != r["belongs"]
     r.update(belongs=new, uncertain="0", labeler="abel")
     changed += 1
-with open("tests/labeled_clusters.csv", "w", newline="") as f:
+with open(labels, "w", newline="") as f:
     w = csv.DictWriter(f, fieldnames=list(rows[0]))
     w.writeheader()
     w.writerows(rows)
 print(f"{changed} etiquetas actualizadas; {flipped} cambiaron respecto a mi primera pasada.")
-print("Ahora mide el efecto:  uv run python scripts/eval_clusters.py")
+print(f"Ahora mide el efecto:  uv run python scripts/eval_clusters.py{' --file ' + labels if len(sys.argv) > 2 else ''}")
