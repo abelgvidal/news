@@ -31,6 +31,24 @@ def fecha_es(dt: datetime, tz: str) -> str:
     return f"{_DAYS[d.weekday()]}, {d.day} de {_MONTHS[d.month - 1]} de {d.year}"
 
 
+_DAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+_MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+              "November", "December"]
+LABELS = {
+    "es": {"site": "News Aggregator", "outlets": "medios", "also_in": "También en", "more": "y {n} más",
+           "dateline": "Lo más citado en los medios · actualizado a las", "paywall": "Puede requerir suscripción",
+           "empty": "Todavía no hay noticias agrupadas."},
+    "en": {"site": "News Aggregator", "outlets": "outlets", "also_in": "Also in", "more": "and {n} more",
+           "dateline": "Most covered in the press · updated at", "paywall": "May require a subscription",
+           "empty": "No grouped stories yet."},
+}
+
+
+def fecha_en(dt: datetime, tz: str) -> str:
+    d = dt.astimezone(ZoneInfo(tz))
+    return f"{_DAYS_EN[d.weekday()]}, {d.day} {_MONTHS_EN[d.month - 1]} {d.year}"
+
+
 def hora_local(dt: datetime, tz: str) -> str:
     return dt.astimezone(ZoneInfo(tz)).strftime("%H:%M")
 
@@ -46,6 +64,7 @@ class Story:
     headline: str  # the representative article's own headline, as published
     url: str | None  # that article
     source: str  # its outlet
+    source_paywall: bool  # that outlet's articles often need a subscription
     image_url: str | None
     updated_at: datetime
     score: float
@@ -68,7 +87,8 @@ class Story:
             url = _web_url(src["url"])
             if links.get(src["name"]) is None:
                 links[src["name"]] = url
-        return [{"name": name, "url": url} for name, url in links.items()]
+        lock = {src["name"]: src["paywall"] for src in self.sources}
+        return [{"name": name, "url": url, "paywall": lock[name]} for name, url in links.items()]
 
 
 def score(outlets: int, last_published: datetime, now: datetime) -> float:
@@ -88,7 +108,7 @@ def build_stories(
     stories = []
     for c in clusters:
         members = conn.execute(
-            "SELECT a.title, a.url, a.image_url, a.published_at, f.name, e.vector "
+            "SELECT a.title, a.url, a.image_url, a.published_at, f.name, f.paywall, e.vector "
             "FROM cluster_member m JOIN article a ON a.id = m.article_id "
             "JOIN feed f ON f.id = a.feed_id JOIN embedding e ON e.article_id = a.id AND e.model = ? "
             "WHERE m.cluster_id = ?", (model, c["id"])
@@ -103,14 +123,15 @@ def build_stories(
         order = sorted(core, key=lambda i: (i != best, -float(sims[i])))
         sources = [
             {"name": members[i]["name"], "title": members[i]["title"], "url": members[i]["url"],
-             "published_at": published[i], "similarity": float(sims[i]), "image_url": members[i]["image_url"]}
+             "published_at": published[i], "similarity": float(sims[i]), "image_url": members[i]["image_url"],
+             "paywall": bool(members[i]["paywall"])}
             for i in order
         ]
         image = next((_web_url(s["image_url"]) for s in sources if _web_url(s["image_url"])), None)
         last = datetime.fromisoformat(c["last_published_at"])
         story = Story(
             cluster_id=c["id"], headline=sources[0]["title"], url=_web_url(sources[0]["url"]),
-            source=sources[0]["name"], image_url=image, updated_at=last, score=0.0, sources=sources,
+            source=sources[0]["name"], source_paywall=sources[0]["paywall"], image_url=image, updated_at=last, score=0.0, sources=sources,
         )
         story.score = score(story.outlets, last, now)
         stories.append(story)
@@ -146,7 +167,8 @@ def render_page(
     countries = countries or [country]
     return _env.get_template("index.html").render(
         stories=top_stories(stories), now=now, country=country, root=root,
-        nav=_nav(countries, country, root), fecha=fecha_es(now, country.tz),
+        nav=_nav(countries, country, root), L=LABELS[country.lang],
+        fecha=(fecha_en if country.lang == "en" else fecha_es)(now, country.tz),
         hora=lambda dt: hora_local(dt, country.tz),
     )
 

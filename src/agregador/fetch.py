@@ -69,9 +69,10 @@ def parse_feed(content: bytes) -> list[Article]:
 
 def _upsert_feed(conn: sqlite3.Connection, feed: FeedConfig) -> sqlite3.Row:
     conn.execute(
-        "INSERT INTO feed (name, url, country) VALUES (?, ?, ?) "
-        "ON CONFLICT(url) DO UPDATE SET name = excluded.name, country = excluded.country",
-        (feed.name, feed.url, feed.country),
+        "INSERT INTO feed (name, url, country, paywall) VALUES (?, ?, ?, ?) "
+        "ON CONFLICT(url) DO UPDATE SET name = excluded.name, country = excluded.country, "
+        "paywall = excluded.paywall",
+        (feed.name, feed.url, feed.country, int(feed.paywall)),
     )
     return conn.execute("SELECT * FROM feed WHERE url = ?", (feed.url,)).fetchone()
 

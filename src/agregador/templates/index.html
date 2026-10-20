@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="{{ country.lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agregador de noticias · {{ country.name }}</title>
+<title>{{ L.site }} · {{ country.name }}</title>
 <style>
   :root { color-scheme: light dark; --bg:#f6f3ec; --paper:#fbf9f4; --fg:#1a1a1a; --muted:#65605a; --rule:#1a1a1a; --hair:#cfc8bb; --accent:#8c1c13; }
   @media (prefers-color-scheme: dark) { :root { --bg:#121212; --paper:#181818; --fg:#ebe7df; --muted:#a09a8f; --rule:#ebe7df; --hair:#3a3733; --accent:#e58a76; } }
@@ -44,6 +44,7 @@
   .lead img { aspect-ratio:3/2; }
   .story h2 a { color:inherit; text-decoration:none; }
   .story h2 a:hover { color:var(--accent); }
+  .lock { font-size:.72em; text-decoration:none; }
   .source { margin:0 0 8px; font: 600 0.8rem system-ui, sans-serif; color:var(--muted); }
   .outlets { margin:0; font: 0.8rem/1.4 system-ui, sans-serif; color:var(--muted); }
   .outlets a { color:inherit; text-decoration:underline; text-decoration-color:var(--hair); text-underline-offset:2px; }
@@ -73,28 +74,29 @@
 </head>
 <body>
 <div class="page">
-<header class="masthead"><h1>Agregador de noticias</h1></header>
+<header class="masthead"><h1>{{ L.site }}</h1></header>
 {% if nav | length > 1 %}
 <nav class="tabs" aria-label="País">{% for t in nav %}<a href="{{ t.href }}"{% if t.active %} aria-current="page"{% endif %}>{{ t.name }}</a>{% endfor %}</nav>
 {% endif %}
-<div class="dateline"><span>{{ fecha }} · {{ country.name }}</span><span>Lo más citado en los medios · actualizado a las {{ hora(now) }}</span></div>
+<div class="dateline"><span>{{ fecha }}</span><span>{{ L.dateline }} {{ hora(now) }}</span></div>
 
 {% macro outlet(o) -%}
   {%- if o.url %}<a href="{{ o.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ o.name }}</a>{% else %}{{ o.name }}{% endif -%}
+  {%- if o.paywall %} <span class="lock" title="{{ L.paywall }}" aria-label="{{ L.paywall }}">🔒</span>{% endif -%}
 {%- endmacro %}
 
 {% macro story(s, kicker=true, img=true) %}
   <article class="story">
     {% if img and s.image_url %}<img src="{{ s.image_url }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}
-    {% if kicker %}<div class="kicker">{{ s.outlets }} medios · {{ hora(s.updated_at) }}</div>{% endif %}
+    {% if kicker %}<div class="kicker">{{ s.outlets }} {{ L.outlets }} · {{ hora(s.updated_at) }}</div>{% endif %}
     <h2>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ s.headline }}</a>{% else %}{{ s.headline }}{% endif %}</h2>
-    <p class="source">{{ s.source }}</p>
+    <p class="source">{{ s.source }}{% if s.source_paywall %} <span class="lock" title="{{ L.paywall }}" aria-label="{{ L.paywall }}">🔒</span>{% endif %}</p>
     {% set links = s.other_outlets %}
     {% if links %}
-    <div class="outlets"><b>También en</b>
+    <div class="outlets"><b>{{ L.also_in }}</b>
       {% for o in links[:4] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}
       {% if links | length > 4 %}
-      <details class="more"><summary>y {{ links | length - 4 }} más</summary>{% for o in links[4:] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</details>
+      <details class="more"><summary>{{ L.more.format(n=links | length - 4) }}</summary>{% for o in links[4:] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</details>
       {% endif %}
     </div>
     {% endif %}
@@ -115,7 +117,7 @@
   {% endif %}
 </main>
 {% else %}
-<p class="empty">Todavía no hay noticias agrupadas.</p>
+<p class="empty">{{ L.empty }}</p>
 {% endif %}
 </div>
 </body>

@@ -4,7 +4,7 @@ A Spanish-language news aggregator. It collects articles from the RSS feeds of p
 
 ## 1. Scope
 
-- **Language**: Spanish. Multiple **countries** are supported as separate tabs (España, Argentina); each country is clustered on its own with its own feeds, and pages are written in Spanish. Cross-language clustering is out of scope (tested on 2026-10-19: correct cross-lingual matches score 0.88-0.91 vs false ones 0.86-0.87, too close for a fixed threshold).
+- **Editions**: two tabs, **International** (first; foreign outlets only, in English, no translation, 12 outlets spread over regions: US, UK, France, EU, Qatar, Israel, Hong Kong, India, Singapore, South Africa) and **Spain** (Spanish outlets, in Spanish). Each edition is clustered on its own; the page language (labels and dates) follows the edition, headlines are always shown as published. The site title and tab names are in English. Argentina is supported by the code but disabled in `feeds.toml`. Cross-language clustering is out of scope (tested on 2026-10-19: correct cross-lingual matches score 0.88-0.91 vs false ones 0.86-0.87, too close for a fixed threshold).
 - **Content**: RSS data only (title, summary, link, publication date, image if present). No full-article fetching in v1.
 - **Audience**: personal use first, public product later. Design choices must not block going public.
 - **Hosting**: one Linux box on Hetzner (e.g. 2 vCPU / 4 GB). No GPU.
@@ -105,7 +105,11 @@ Some failures may be bot blocking tied to the User-Agent rather than a dead URL.
 
 Note that feed sizes vary a lot (10 to 205 items). Europa Press and El Confidencial return few items, which affects how much they contribute to clusters.
 
-### Argentina (verified 2026-10-19)
+### Paywalls
+
+Outlets whose articles often need a subscription carry `paywall = true` in `feeds.toml` and are shown with a lock. Marked: NYT, WSJ, FT, The Hindu, El País, El Mundo, ABC, Expansión. Checked with the structured data flag `isAccessibleForFree` where the sites allowed it (The Hindu, ABC, El Mundo, Expansión); NYT, WSJ, FT and El País block article downloads, so they come from public knowledge. The flag was not trusted blindly (it marks elDiario.es, which is free). Unknown: SCMP.
+
+### Argentina (disabled; verified 2026-10-19)
 
 Clarín (4 section feeds), La Nación, Infobae, Página/12, Perfil, Ámbito, TN, El Cronista, Noticias Argentinas. Note: Clarín and TN share an owner. No usable feed found for El Destape, La Voz, Cadena 3, Crónica, La Capital, Los Andes, MDZ.
 

@@ -1,33 +1,118 @@
-# Countries: the first one is the home page (site/index.html); the others go in site/<code>/.
+# Countries ("editions"): the first one is the home page (site/index.html), the others go in site/<code>/.
+# name = tab label (English); lang = language of that page's labels and dates (headlines are shown as published).
+[[country]]
+code = "int"
+name = "International"
+tz = "Europe/Madrid"
+lang = "en"
+
 [[country]]
 code = "es"
-name = "España"
+name = "Spain"
 tz = "Europe/Madrid"
-
-[[country]]
-code = "ar"
-name = "Argentina"
-tz = "America/Argentina/Buenos_Aires"
+lang = "es"
 
 # One [[feed]] per feed. An outlet may have several feeds (same name): it counts once.
-# Adding a feed is a config change only.
+# paywall = true shows a lock: the outlet's articles often need a subscription (hard or metered).
+# Verified where the sites allowed it (structured data `isAccessibleForFree`), otherwise from public knowledge;
+# NYT, WSJ, FT, The Hindu, El País, El Mundo, ABC and Expansión are marked. Edit freely.
 
-# --- España
+# --- International: foreign outlets only, in English, spread across regions (12 outlets)
+[[feed]]
+name = "The New York Times"
+url = "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
+country = "int"
+paywall = true
+
+[[feed]]
+name = "The New York Times"
+url = "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml"
+country = "int"
+paywall = true
+
+[[feed]]
+name = "The Wall Street Journal"
+url = "https://feeds.content.dowjones.io/public/rss/RSSWorldNews"
+country = "int"
+paywall = true
+
+[[feed]]
+name = "Financial Times"
+url = "https://www.ft.com/world?format=rss"
+country = "int"
+paywall = true
+
+[[feed]]
+name = "Financial Times"
+url = "https://www.ft.com/rss/home"
+country = "int"
+paywall = true
+
+[[feed]]
+name = "BBC News"
+url = "https://feeds.bbci.co.uk/news/world/rss.xml"
+country = "int"
+
+[[feed]]
+name = "France 24"
+url = "https://www.france24.com/en/rss"
+country = "int"
+
+[[feed]]
+name = "Euronews"
+url = "https://www.euronews.com/rss?format=mrss&level=theme&name=news"
+country = "int"
+
+[[feed]]
+name = "Al Jazeera"
+url = "https://www.aljazeera.com/xml/rss/all.xml"
+country = "int"
+
+[[feed]]
+name = "The Times of Israel"
+url = "https://www.timesofisrael.com/feed/"
+country = "int"
+
+[[feed]]
+name = "South China Morning Post"
+url = "https://www.scmp.com/rss/91/feed"
+country = "int"
+
+[[feed]]
+name = "The Hindu"
+url = "https://www.thehindu.com/news/international/feeder/default.rss"
+country = "int"
+paywall = true
+
+[[feed]]
+name = "The Straits Times"
+url = "https://www.straitstimes.com/news/world/rss.xml"
+country = "int"
+
+[[feed]]
+name = "Daily Maverick"
+url = "https://www.dailymaverick.co.za/dmrss/"
+country = "int"
+
+# --- Spain
 
 [[feed]]
 name = "El País"
 url = "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"
 country = "es"
+paywall = true
 
 [[feed]]
 name = "El Mundo"
 url = "https://e00-elmundo.uecdn.es/elmundo/rss/portada.xml"
 country = "es"
+paywall = true
 
 [[feed]]
 name = "ABC"
 url = "https://www.abc.es/rss/2.0/portada/"
 country = "es"
+paywall = true
 
 [[feed]]
 name = "La Vanguardia"
@@ -68,6 +153,7 @@ country = "es"
 name = "Expansión"
 url = "https://e00-expansion.uecdn.es/rss/portada.xml"
 country = "es"
+paywall = true
 
 [[feed]]
 name = "La Voz de Galicia"
@@ -94,78 +180,92 @@ name = "infoLibre"
 url = "https://www.infolibre.es/rss/"
 country = "es"
 
-
 [[feed]]
 name = "El Periódico de España"
 url = "https://www.epe.es/es/rss/espana/rss.xml"
 country = "es"
-# Its firewall answers 406 to our default User-Agent; a browser-like one is accepted.
 user_agent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 
-# --- Argentina
+# --- Argentina (disabled: uncomment this block and add it to the countries above to bring it back)
+# [[country]]
+# code = "ar"
+# name = "Argentina"
+# tz = "America/Argentina/Buenos_Aires"
+# lang = "es"
+#
+# [[feed]]
+# name = "Clarín"
+# url = "https://www.clarin.com/rss/lo-ultimo/"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "Clarín"
+# url = "https://www.clarin.com/rss/politica/"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "Clarín"
+# url = "https://www.clarin.com/rss/sociedad/"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "Clarín"
+# url = "https://www.clarin.com/rss/mundo/"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "La Nación"
+# url = "https://www.lanacion.com.ar/arc/outboundfeeds/rss/?outputType=xml"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "Infobae"
+# url = "https://www.infobae.com/arc/outboundfeeds/rss/"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "Página/12"
+# url = "https://www.pagina12.com.ar/arc/outboundfeeds/rss/?outputType=xml"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "Perfil"
+# url = "https://www.perfil.com/feed"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "Ámbito"
+# url = "https://www.ambito.com/rss/pages/home.xml"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "TN"
+# url = "https://tn.com.ar/arc/outboundfeeds/rss/?outputType=xml"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "El Cronista"
+# url = "https://www.cronista.com/arc/outboundfeeds/rss/?outputType=xml"
+# country = "ar"
+#
+#
+# [[feed]]
+# name = "Noticias Argentinas"
+# url = "https://noticiasargentinas.com/rss"
+# country = "ar"
+#
+#
 
-[[feed]]
-name = "Clarín"
-url = "https://www.clarin.com/rss/lo-ultimo/"
-country = "ar"
-
-[[feed]]
-name = "Clarín"
-url = "https://www.clarin.com/rss/politica/"
-country = "ar"
-
-[[feed]]
-name = "Clarín"
-url = "https://www.clarin.com/rss/sociedad/"
-country = "ar"
-
-[[feed]]
-name = "Clarín"
-url = "https://www.clarin.com/rss/mundo/"
-country = "ar"
-
-[[feed]]
-name = "La Nación"
-url = "https://www.lanacion.com.ar/arc/outboundfeeds/rss/?outputType=xml"
-country = "ar"
-
-[[feed]]
-name = "Infobae"
-url = "https://www.infobae.com/arc/outboundfeeds/rss/"
-country = "ar"
-
-[[feed]]
-name = "Página/12"
-url = "https://www.pagina12.com.ar/arc/outboundfeeds/rss/?outputType=xml"
-country = "ar"
-
-[[feed]]
-name = "Perfil"
-url = "https://www.perfil.com/feed"
-country = "ar"
-
-[[feed]]
-name = "Ámbito"
-url = "https://www.ambito.com/rss/pages/home.xml"
-country = "ar"
-
-[[feed]]
-name = "TN"
-url = "https://tn.com.ar/arc/outboundfeeds/rss/?outputType=xml"
-country = "ar"
-
-[[feed]]
-name = "El Cronista"
-url = "https://www.cronista.com/arc/outboundfeeds/rss/?outputType=xml"
-country = "ar"
-
-[[feed]]
-name = "Noticias Argentinas"
-url = "https://noticiasargentinas.com/rss"
-country = "ar"
-
-
-# No usable RSS (blocked, removed or stale) as of 2026-10-19:
-#   España: RTVE, La Razón, Público, El Periódico (Barcelona), Cadena SER, Marca, El Independiente.
+# No usable RSS (blocked, removed or stale) as of 2026-10-20:
+#   Spain: RTVE, La Razón, Público, El Periódico (Barcelona), Cadena SER, Marca, El Independiente.
 #   Argentina: El Destape, La Voz, Cadena 3, Crónica, La Capital, Los Andes, MDZ.
-# See REQUIREMENTS.md section 5.
