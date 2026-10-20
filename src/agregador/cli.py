@@ -5,6 +5,7 @@ from pathlib import Path
 from . import db
 from .config import load_countries, load_feeds
 from .cluster import Params, cluster_pending, reset_clusters
+from .edition import make_edition, refresh_site
 from .embed import DEFAULT_MODEL, embed_pending
 from .fetch import fetch_all
 from .render import write_site
@@ -12,6 +13,7 @@ from .render import write_site
 DEFAULT_DB = Path("data/agregador.db")
 DEFAULT_FEEDS = Path("feeds.toml")
 DEFAULT_SITE = Path("site")
+DEFAULT_TZ = "Europe/Madrid"  # the day an edition belongs to
 
 
 def main() -> None:
@@ -22,10 +24,16 @@ def main() -> None:
     sub.add_parser("fetch", help="fetch all feeds and store new articles")
     sub.add_parser("health", help="show per-feed health")
     sub.add_parser("embed", help="embed articles that have no vector yet")
-    p_render = sub.add_parser("render", help="write the static front page")
+    p_render = sub.add_parser("render", help="write a live preview of the front pages (no images, not archived)")
     p_render.add_argument("--out", type=Path, default=DEFAULT_SITE)
-    p_run = sub.add_parser("run", help="full cycle: fetch, purge, embed, cluster, render")
-    p_run.add_argument("--out", type=Path, default=DEFAULT_SITE)
+    sub.add_parser("run", help="collect: fetch, purge, embed, cluster (publishing is `edition`)")
+    p_edition = sub.add_parser("edition", help="publish today's edition: pages, images and manifest, then the home page")
+    p_edition.add_argument("--out", type=Path, default=DEFAULT_SITE)
+    p_edition.add_argument("--tz", default=DEFAULT_TZ)
+    p_edition.add_argument("--force", action="store_true", help="replace today's edition if it exists")
+    p_edition.add_argument("--no-images", action="store_true")
+    p_site = sub.add_parser("site", help="rebuild all pages from the published editions")
+    p_site.add_argument("--out", type=Path, default=DEFAULT_SITE)
     p_cluster = sub.add_parser("cluster", help="assign unclustered articles to clusters")
     p_cluster.add_argument("--threshold", type=float, default=Params().threshold)
     p_re = sub.add_parser("recluster", help="drop all clusters and rebuild (re-embeds if the model changed)")
@@ -58,9 +66,14 @@ def main() -> None:
         purged = db.purge_old(conn)
         embedded = embed_pending(conn)
         assigned, clusters = cluster_pending(conn, DEFAULT_MODEL)
-        pages = write_site(conn, DEFAULT_MODEL, args.out, load_countries(args.feeds))
-        logging.info("run: %d new, %d purged, %d embedded, %d assigned (%d new clusters) -> %d pages",
-                     new, purged, embedded, assigned, clusters, len(pages))
+        logging.info("run: %d new, %d purged, %d embedded, %d assigned (%d new clusters)",
+                     new, purged, embedded, assigned, clusters)
+    elif args.command == "edition":
+        target = make_edition(conn, DEFAULT_MODEL, load_countries(args.feeds), args.out, args.tz,
+                              force=args.force, images=not args.no_images)
+        print(target or "today's edition already exists (use --force to replace it)")
+    elif args.command == "site":
+        refresh_site(args.out)
     elif args.command == "embed":
         print(f"{embed_pending(conn)} articles embedded")
     elif args.command == "cluster":

@@ -41,10 +41,16 @@ _MONTHS_EN = ["January", "February", "March", "April", "May", "June", "July", "A
 LABELS = {
     "es": {"site": "News Aggregator", "outlets": "medios", "also_in": "También en", "more": "y {n} más",
            "dateline": "Lo más citado en los medios · actualizado a las", "paywall": "Puede requerir suscripción",
-           "empty": "Todavía no hay noticias agrupadas.", "no_country": "Sin país identificado"},
+           "empty": "Todavía no hay noticias agrupadas.", "no_country": "Sin país identificado",
+           "edition": "Lo más citado en los medios · edición de las", "image": "Imagen", "archive": "Archivo",
+           "prev": "Anterior", "next": "Siguiente", "latest": "Última edición",
+           "none": "Todavía no hay ediciones."},
     "en": {"site": "News Aggregator", "outlets": "outlets", "also_in": "Also in", "more": "and {n} more",
            "dateline": "Most covered in the press · updated at", "paywall": "May require a subscription",
-           "empty": "No grouped stories yet.", "no_country": "No country identified"},
+           "empty": "No grouped stories yet.", "no_country": "No country identified",
+           "edition": "Most covered in the press · edition of", "image": "Image", "archive": "Archive",
+           "prev": "Previous", "next": "Next", "latest": "Latest edition",
+           "none": "No editions yet."},
 }
 
 
@@ -75,6 +81,8 @@ class Story:
     sources: list[dict]  # every article, the representative first, then by similarity to it
     centroid: np.ndarray | None = None  # mean embedding of the story's articles
     entities: frozenset = frozenset()  # proper-noun stems of its headlines
+    image: dict | None = None  # the saved thumbnail (see images.py and edition.py), None when the story has none
+    fixed_involved: list[str] | None = None  # countries frozen when an edition was published
 
     @property
     def outlets(self) -> int:
@@ -83,6 +91,8 @@ class Story:
     @property
     def involved(self) -> list[str]:
         """The countries the story involves, heaviest first (empty when the headlines name none)."""
+        if self.fixed_involved is not None:
+            return self.fixed_involved
         return involved_countries([s["title"] for s in self.sources])
 
     @property
@@ -119,9 +129,9 @@ def score(outlets: int, last_published: datetime, now: datetime) -> float:
 
 
 def build_stories(
-    conn: sqlite3.Connection, model: str, now: datetime, country: str = "es"
+    conn: sqlite3.Connection, model: str, now: datetime, country: str = "es", active_hours: int = ACTIVE_HOURS
 ) -> list[Story]:
-    since = (now - timedelta(hours=ACTIVE_HOURS)).isoformat()
+    since = (now - timedelta(hours=active_hours)).isoformat()
     clusters = conn.execute(
         "SELECT id, last_published_at FROM cluster "
         "WHERE model = ? AND country = ? AND last_published_at >= ?", (model, country, since)
@@ -193,6 +203,21 @@ def foreign_filter(others: list[Story]):
     return lambda s: judge([x["url"] for x in s.sources], s.centroid, s.entities, candidates).foreign
 
 
+def front_pages(
+    conn: sqlite3.Connection, model: str, now: datetime, countries: list[Country], active_hours: int = ACTIVE_HOURS
+) -> dict[str, list[Story]]:
+    """The front page stories of every edition (country), keyed by country code."""
+    built = {c.code: build_stories(conn, model, now, c.code, active_hours) for c in countries}
+    pages = {}
+    for country in countries:
+        exclude = None
+        if country.exclude_foreign:  # world news belongs to the other editions
+            others = [s for c in countries if c.code != country.code for s in ranked(built[c.code])[:OTHERS_TOP]]
+            exclude = foreign_filter(others)
+        pages[country.code] = top_stories(built[country.code], exclude, country.max_per_country)
+    return pages
+
+
 def _nav(countries: list[Country], current: Country, root: str) -> list[dict]:
     """Tab links relative to the current page, so the site works from any folder."""
     return [
@@ -208,10 +233,13 @@ def render_page(
     country: Country = DEFAULT_COUNTRY,
     countries: list[Country] | None = None,
     root: str = "",
+    edition: dict | None = None,
 ) -> str:
+    """One page. `edition` ({assets, prev, next, archive}: hrefs from this page) marks a published edition."""
     countries = countries or [country]
     return _env.get_template("index.html").render(
-        stories=top_stories(stories), now=now, country=country, root=root,
+        stories=top_stories(stories), now=now, country=country, root=root, edition=edition,
+        assets=edition["assets"] if edition else "",
         nav=_nav(countries, country, root), L=LABELS[country.lang],
         fecha=(fecha_en if country.lang == "en" else fecha_es)(now, country.tz),
         hora=lambda dt: hora_local(dt, country.tz),
@@ -232,13 +260,9 @@ def write_site(
     countries = countries or [DEFAULT_COUNTRY]
     now = datetime.now(UTC)
     paths = []
-    built = {c.code: build_stories(conn, model, now, c.code) for c in countries}
+    pages = front_pages(conn, model, now, countries)
     for i, country in enumerate(countries):
-        exclude = None
-        if country.exclude_foreign:  # world news belongs to the other editions
-            others = [s for c in countries if c.code != country.code for s in ranked(built[c.code])[:OTHERS_TOP]]
-            exclude = foreign_filter(others)
-        stories = top_stories(built[country.code], exclude, country.max_per_country)
+        stories = pages[country.code]
         home = i == 0
         html = render_page(stories, now, country, countries, root="" if home else "../")
         target = out_dir / "index.html" if home else out_dir / country.code / "index.html"
