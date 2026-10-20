@@ -1,9 +1,0 @@
-[Unit]
-Description=Publish the daily edition at 07:00 Madrid time
-
-[Timer]
-OnCalendar=*-*-* 07:00:00 Europe/Madrid
-Persistent=true
-
-[Install]
-WantedBy=timers.target

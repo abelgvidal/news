@@ -70,7 +70,7 @@ Collection and publishing are separate on purpose. Many feeds only keep the last
 - `agregador fetch` every 15 minutes: light, no model loaded.
 - `agregador run` + `agregador edition` once a day at 07:00 Madrid time.
 
-`deploy/` has example systemd units. State (the SQLite database) is cheap to lose; the published editions are not, because feeds forget. Back those up.
+The timers are two systemd units: the 15-minute `fetch` (a `oneshot` service run by `OnUnitActiveSec=15min`) and the daily edition (`OnCalendar=*-*-* 07:00:00 Europe/Madrid`, which runs `run` and then `edition`). State (the SQLite database) is cheap to lose; the published editions are not, because feeds forget. Back those up.
 
 ## Layout
 
@@ -80,7 +80,6 @@ migrations/      SQLite schema, applied in order
 feeds.toml       editions and outlets
 scripts/         evaluation and labelling helpers
 tests/           unit tests and the labelled sets
-deploy/          systemd units
 REQUIREMENTS.md  what it should do, and why
 ```
 
