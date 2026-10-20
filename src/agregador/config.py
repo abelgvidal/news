@@ -19,6 +19,7 @@ class Country:
     name: str
     tz: str = "UTC"
     lang: str = "es"  # language of the page: labels and dates (the headlines are shown as published)
+    exclude_foreign: bool = False  # keep out stories about the rest of the world (see foreign.py)
 
 
 def _load(path: Path) -> dict:

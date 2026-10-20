@@ -12,11 +12,13 @@ import numpy as np
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 from .config import Country
+from .foreign import centroid, entity_stems, judge
 from .representative import choose_story
 
 ACTIVE_HOURS = 48
 HALF_LIFE_HOURS = 24
 MAX_STORIES = 10
+OTHERS_TOP = 40  # stories of the other editions a story is compared with
 
 DEFAULT_COUNTRY = Country("es", "España", "Europe/Madrid")
 _DAYS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
@@ -69,6 +71,8 @@ class Story:
     updated_at: datetime
     score: float
     sources: list[dict]  # every article, the representative first, then by similarity to it
+    centroid: np.ndarray | None = None  # mean embedding of the story's articles
+    entities: frozenset = frozenset()  # proper-noun stems of its headlines
 
     @property
     def outlets(self) -> int:
@@ -131,7 +135,9 @@ def build_stories(
         last = datetime.fromisoformat(c["last_published_at"])
         story = Story(
             cluster_id=c["id"], headline=sources[0]["title"], url=_web_url(sources[0]["url"]),
-            source=sources[0]["name"], source_paywall=sources[0]["paywall"], image_url=image, updated_at=last, score=0.0, sources=sources,
+            source=sources[0]["name"], source_paywall=sources[0]["paywall"], image_url=image, updated_at=last,
+            score=0.0, sources=sources, centroid=centroid(vecs[core]),
+            entities=entity_stems([members[i]["title"] for i in core]),
         )
         story.score = score(story.outlets, last, now)
         stories.append(story)
@@ -143,9 +149,22 @@ def ranked(stories: list[Story]) -> list[Story]:
     return sorted((s for s in stories if s.outlets > 1), key=lambda s: s.score, reverse=True)
 
 
-def top_stories(stories: list[Story]) -> list[Story]:
-    """The front page: the most covered stories."""
-    return ranked(stories)[:MAX_STORIES]
+def top_stories(stories: list[Story], exclude=None) -> list[Story]:
+    """The front page: the most covered stories, skipping those `exclude(story)` rejects."""
+    front = []
+    for story in ranked(stories):
+        if exclude and exclude(story):
+            continue
+        front.append(story)
+        if len(front) == MAX_STORIES:
+            break
+    return front
+
+
+def foreign_filter(others: list[Story]):
+    """A predicate that is true for stories about the rest of the world, given the other editions' stories."""
+    candidates = [(s.centroid, s.entities) for s in others if s.centroid is not None]
+    return lambda s: judge([x["url"] for x in s.sources], s.centroid, s.entities, candidates).foreign
 
 
 def _nav(countries: list[Country], current: Country, root: str) -> list[dict]:
@@ -187,9 +206,13 @@ def write_site(
     countries = countries or [DEFAULT_COUNTRY]
     now = datetime.now(UTC)
     paths = []
+    built = {c.code: build_stories(conn, model, now, c.code) for c in countries}
     for i, country in enumerate(countries):
-        stories = build_stories(conn, model, now, country.code)
-        stories = top_stories(stories)
+        exclude = None
+        if country.exclude_foreign:  # world news belongs to the other editions
+            others = [s for c in countries if c.code != country.code for s in ranked(built[c.code])[:OTHERS_TOP]]
+            exclude = foreign_filter(others)
+        stories = top_stories(built[country.code], exclude)
         home = i == 0
         html = render_page(stories, now, country, countries, root="" if home else "../")
         target = out_dir / "index.html" if home else out_dir / country.code / "index.html"
