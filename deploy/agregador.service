@@ -1,11 +1,11 @@
 [Unit]
-Description=Agregador: fetch, cluster and render the front page
+Description=Agregador: fetch, embed and cluster (the edition is published once a day by agregador-edition)
 After=network-online.target
 
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/agregador
-ExecStart=/usr/bin/flock -n /run/agregador.lock /opt/agregador/.venv/bin/agregador run --out /var/www/agregador
+ExecStart=/usr/bin/flock -n /run/agregador.lock /opt/agregador/.venv/bin/agregador run
 User=agregador
 Environment=HF_HOME=/opt/agregador/.cache/huggingface
 Nice=10

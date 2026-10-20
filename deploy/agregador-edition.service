@@ -1,0 +1,13 @@
+[Unit]
+Description=Agregador: publish today's edition (pages, images, manifest) to the web root
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/agregador
+# collect one last time, then publish; both wait for any collection already running
+ExecStart=/usr/bin/flock -w 900 /run/agregador.lock /opt/agregador/.venv/bin/agregador run
+ExecStart=/usr/bin/flock -w 900 /run/agregador.lock /opt/agregador/.venv/bin/agregador edition --out /var/www/agregador
+User=agregador
+Environment=HF_HOME=/opt/agregador/.cache/huggingface
+Nice=10

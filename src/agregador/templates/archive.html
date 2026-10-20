@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ L.site }} · {{ L.archive }}</title>
+<style>
+{% include "style.css" %}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="masthead"><h1><a href="{{ root }}index.html" style="color:inherit;text-decoration:none">{{ L.site }}</a></h1></header>
+<div class="dateline"><span>{{ L.archive }}</span><span><a href="{{ root }}index.html">{{ L.latest }}</a></span></div>
+<main class="archive">
+{% for month in months %}
+  <h2>{{ month.name }}</h2>
+  <ul>{% for d in month.days %}<li><a href="{{ root }}{{ d.date }}/index.html">{{ d.label }}</a>{% for t in d.tabs[1:] %} <span>· <a href="{{ root }}{{ d.date }}/{{ t.code }}/index.html">{{ t.name }}</a></span>{% endfor %}</li>{% endfor %}</ul>
+{% else %}
+  <p class="empty">{{ L.none }}</p>
+{% endfor %}
+</main>
+</div>
+</body>
+</html>
