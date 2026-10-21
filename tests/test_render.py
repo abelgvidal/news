@@ -45,7 +45,7 @@ def test_other_outlets_exclude_the_representatives_and_fold_after_four():
     s = story(1, 7, 1)                       # M0 is the representative; M1..M6 are the others
     assert [o["name"] for o in s.other_outlets] == ["M1", "M2", "M3", "M4", "M5", "M6"]
     html = render_page([s], NOW)
-    assert html.count("<details") == 1 and "y 2 más" in html
+    assert html.count('<details class="more"') == 1 and "y 2 más" in html
     shown, folded = html[:html.index("<details")], html[html.index("<details"):]
     assert all(f'href="https://e.com/1/{i}"' in shown for i in (1, 2, 3, 4))
     assert all(f'href="https://e.com/1/{i}"' in folded for i in (5, 6))
@@ -53,7 +53,7 @@ def test_other_outlets_exclude_the_representatives_and_fold_after_four():
 
 
 def test_few_outlets_need_no_toggle():
-    assert "<details" not in render_page([story(1, 3, 1)], NOW)
+    assert '<details class="more"' not in render_page([story(1, 3, 1)], NOW)
 
 
 def test_only_http_urls_become_links_and_unsafe_ones_are_dropped():
@@ -171,7 +171,7 @@ def test_a_spanish_page_keeps_spanish_labels_but_the_english_title():
 def test_paywalled_outlets_get_a_lock_where_they_are_named_and_others_do_not():
     s = story(1, 4, 1, paywalled={"M0", "M2"})
     html = render_page([s], NOW, EN)
-    assert html.count("🔒") == 2                                           # the source label and M2 in "Also in"
+    assert html.count("🔒") == 3        # the source label, and M2 in "Also in" (the full list and the phone's folded one)
     assert 'title="May require a subscription"' in html
     assert s.other_outlets[1]["paywall"] is True and s.other_outlets[0]["paywall"] is False
 
@@ -214,7 +214,7 @@ def test_write_site_keeps_world_news_out_of_spain_but_in_international(tmp_path)
     add_cluster(3, "es", "Sánchez disuelve las Cortes y convoca elecciones", "espana", [0.1, 1])
     add_cluster(4, "es", "Meloni envía militares a Milán", "internacional", [0.7, -0.7])          # world by URL section
     int_c, es_c = Country("int", "International", "Europe/Madrid", "en"), Country("es", "Spain", "Europe/Madrid", "es", True)
-    write_site(conn, "m", tmp_path / "site", [int_c, es_c])
+    write_site(conn, "m", tmp_path / "site", [int_c, es_c], now=NOW)
     spain = (tmp_path / "site" / "es" / "index.html").read_text()
     assert "Sánchez disuelve las Cortes" in spain
     assert "Meloni envía militares" not in spain                       # excluded by the URL section

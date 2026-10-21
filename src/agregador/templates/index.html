@@ -15,7 +15,7 @@
 <nav class="tabs" aria-label="País">{% for t in nav %}<a href="{{ t.href }}"{% if t.active %} aria-current="page"{% endif %}>{{ t.name }}</a>{% endfor %}</nav>
 {% endif %}
 {% if edition %}
-<div class="dateline"><span class="nav">{% if edition.prev %}<a href="{{ edition.prev }}" rel="prev">← {{ L.prev }}</a>{% endif %}<span>{{ fecha }}</span>{% if edition.next %}<a href="{{ edition.next }}" rel="next">{{ L.next }} →</a>{% endif %}</span><span><a href="{{ edition.archive }}">{{ L.archive }}</a> · {{ L.edition }} {{ hora(now) }}</span></div>
+<div class="dateline"><span class="nav">{% if edition.prev %}<a class="d-prev" href="{{ edition.prev }}" rel="prev">← {{ L.prev }}</a>{% endif %}<span class="d-date">{{ fecha }}</span>{% if edition.next %}<a class="d-next" href="{{ edition.next }}" rel="next">{{ L.next }} →</a>{% endif %}</span><span class="d-edition"><a href="{{ edition.archive }}">{{ L.archive }}</a> · <span class="edtext">{{ L.edition }}</span> {{ hora(now) }}</span></div>
 {% else %}
 <div class="dateline"><span>{{ fecha }}</span><span>{{ L.dateline }} {{ hora(now) }}</span></div>
 {% endif %}
@@ -26,17 +26,22 @@
 {%- endmacro %}
 
 {% macro story(s, kicker=true, img=true) %}
-  <article class="story">
-    {% if img and s.image %}<figure><img src="{{ assets }}{{ s.image.file }}" alt="{{ s.headline }}" width="{{ s.image.width }}" height="{{ s.image.height }}" loading="lazy"><figcaption>{{ L.image }}: {{ s.image.outlet }}</figcaption></figure>{% endif %}
+  <article class="story{% if img and s.image %} has-img{% endif %}">
+    {% if img and s.image %}<figure><img src="{{ assets }}{{ s.image.file }}" alt="{{ s.headline }}" width="{{ s.image.width }}" height="{{ s.image.height }}" loading="lazy"><figcaption title="{{ L.image }}: {{ s.image.outlet }}">{{ L.image }}: {{ s.image.outlet }}</figcaption></figure>{% endif %}
     {% if kicker %}<div class="kicker">{% if country.show_flags %}<span class="flag" title="{{ s.involved | join(', ') or L.no_country }}" aria-label="{{ s.involved | join(', ') or L.no_country }}">{{ s.flags }}</span> {% endif %}{{ s.outlets }} {{ L.outlets }} · {{ hora(s.updated_at) }}</div>{% endif %}
     <h2>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ s.headline }}</a>{% else %}{{ s.headline }}{% endif %}</h2>
     <p class="source">{{ s.source }}{% if s.source_paywall %} <span class="lock" title="{{ L.paywall }}" aria-label="{{ L.paywall }}">🔒</span>{% endif %}</p>
     {% set links = s.other_outlets %}
     {% if links %}
-    <div class="outlets"><b>{{ L.also_in }}</b>
-      {% for o in links[:4] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}
-      {% if links | length > 4 %}
-      <details class="more"><summary>{{ L.more.format(n=links | length - 4) }}</summary>{% for o in links[4:] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</details>
+    <div class="outlets{% if links | length > 2 %} many{% endif %}">
+      <div class="outlets-full"><b>{{ L.also_in }}</b>
+        {% for o in links[:4] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}
+        {% if links | length > 4 %}
+        <details class="more"><summary>{{ L.more.format(n=links | length - 4) }}</summary>{% for o in links[4:] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</details>
+        {% endif %}
+      </div>
+      {% if links | length > 2 %}
+      <details class="outlets-compact"><summary>{{ L.also_in }} {{ links | length }} {{ L.outlets }}</summary>{% for o in links %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</details>
       {% endif %}
     </div>
     {% endif %}
