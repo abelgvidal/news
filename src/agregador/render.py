@@ -254,11 +254,12 @@ def _write_atomic(target: Path, html: str) -> None:
 
 
 def write_site(
-    conn: sqlite3.Connection, model: str, out_dir: Path, countries: list[Country] | None = None
+    conn: sqlite3.Connection, model: str, out_dir: Path, countries: list[Country] | None = None,
+    now: datetime | None = None,
 ) -> list[Path]:
     """One page per country: the first is site/index.html, the rest site/<code>/index.html."""
     countries = countries or [DEFAULT_COUNTRY]
-    now = datetime.now(UTC)
+    now = now or datetime.now(UTC)
     paths = []
     pages = front_pages(conn, model, now, countries)
     for i, country in enumerate(countries):
