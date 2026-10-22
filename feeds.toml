@@ -18,7 +18,7 @@ exclude_foreign = true  # world news goes to International (URL section, or alre
 # One [[feed]] per feed. An outlet may have several feeds (same name): it counts once.
 # paywall = true shows a lock: the outlet's articles often need a subscription (hard or metered).
 # Verified where the sites allowed it (structured data `isAccessibleForFree`), otherwise from public knowledge;
-# NYT, WSJ, FT, The Hindu, El País, El Mundo, ABC and Expansión are marked. Edit freely.
+# NYT, WSJ, FT, Haaretz, El País, El Mundo, ABC and Expansión are marked. Edit freely.
 
 # --- International: foreign outlets only, in English, spread across regions (16 outlets)
 [[feed]]
@@ -72,9 +72,10 @@ url = "https://www.aljazeera.com/xml/rss/all.xml"
 country = "int"
 
 [[feed]]
-name = "The Times of Israel"
-url = "https://www.timesofisrael.com/feed/"
+name = "Haaretz"
+url = "https://www.haaretz.com/srv/haaretz-latest-headlines"  # The Times of Israel blocks our server
 country = "int"
+paywall = true
 
 [[feed]]
 name = "South China Morning Post"
@@ -82,10 +83,9 @@ url = "https://www.scmp.com/rss/91/feed"
 country = "int"
 
 [[feed]]
-name = "The Hindu"
-url = "https://www.thehindu.com/news/international/feeder/default.rss"
+name = "Hindustan Times"
+url = "https://www.hindustantimes.com/feeds/rss/world-news/rssfeed.xml"  # The Hindu blocks our server
 country = "int"
-paywall = true
 
 [[feed]]
 name = "The Straits Times"
