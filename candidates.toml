@@ -14,9 +14,9 @@ name = "Africanews"
 url = "https://www.africanews.com/feed/rss"
 edition = "int"
 region = "Africa"
-status = "ok"
+status = "adopted"
 tested = "2026-10-22 laptop 200, server 200"
-notes = "50 items, 57 h deep. Covers Africa and the world (Euronews sibling)."
+notes = "50 items, 62 h deep. Covers Africa and the world. Same company as Euronews (a sibling newsroom): disclose it."
 
 [[candidate]]
 name = "Premium Times (Nigeria)"
@@ -42,6 +42,16 @@ edition = "int"
 region = "Africa"
 status = "blocked"
 tested = "2026-10-22 laptop 403"
+
+# ---------- Europe ----------
+[[candidate]]
+name = "Deutsche Welle"
+url = "https://rss.dw.com/xml/rss-en-top"
+edition = "int"
+region = "Europe"
+status = "adopted"
+tested = "2026-10-22 server 200"
+notes = "21 items, 23 h deep, top stories in English. German public international broadcaster (state-funded). The rdf feeds (rss-en-all, rss-en-world) have no readable dates."
 
 # ---------- Latin America ----------
 [[candidate]]
