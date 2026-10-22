@@ -19,6 +19,7 @@ log = logging.getLogger(__name__)
 
 WIDTH = 800  # thumbnails are at most this wide
 QUALITY = 75
+GOOD_WIDTH = 600  # an image this wide is good enough to stop looking for a better one
 MIN_WIDTH = 200  # smaller than this is an icon or a tracking pixel, not a story image
 MAX_BYTES = 8_000_000
 MAX_PIXELS = 40_000_000
@@ -87,7 +88,11 @@ def thumbnail(data: bytes, description: str, copyright_: str) -> tuple[bytes, in
 
 
 def save_story_image(client: httpx.Client, candidates: list[dict], headline: str, target: Path) -> dict | None:
-    """Download the first usable candidate ({url, outlet, article_url}) to `target`; return what we know of it."""
+    """Download the best candidate ({url, outlet, article_url}) to `target`; return what we know of it.
+
+    Candidates are tried in order and the first one at least GOOD_WIDTH wide wins; if none is, the widest is kept.
+    """
+    best = None  # (width, webp, height, candidate)
     for c in candidates[:MAX_TRIES]:
         data = fetch(client, c["url"])
         made = data and thumbnail(
@@ -95,8 +100,14 @@ def save_story_image(client: httpx.Client, candidates: list[dict], headline: str
         if not made:
             continue
         webp, width, height = made
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(webp)
-        return {"file": target.name, "width": width, "height": height, "sha256": hashlib.sha256(webp).hexdigest(),
-                "original_url": c["url"], "outlet": c["outlet"], "article_url": c["article_url"]}
-    return None
+        if best is None or width > best[0]:
+            best = (width, webp, height, c)
+        if width >= GOOD_WIDTH:
+            break
+    if best is None:
+        return None
+    width, webp, height, c = best
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(webp)
+    return {"file": target.name, "width": width, "height": height, "sha256": hashlib.sha256(webp).hexdigest(),
+            "original_url": c["url"], "outlet": c["outlet"], "article_url": c["article_url"]}
