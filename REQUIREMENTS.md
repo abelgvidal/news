@@ -112,7 +112,7 @@ Note that feed sizes vary a lot (10 to 205 items). Europa Press and El Confidenc
 
 ### Paywalls
 
-Outlets whose articles often need a subscription carry `paywall = true` in `feeds.toml` and are shown with a lock. Marked: NYT, WSJ, FT, The Hindu, El País, El Mundo, ABC, Expansión. Checked with the structured data flag `isAccessibleForFree` where the sites allowed it (The Hindu, ABC, El Mundo, Expansión); NYT, WSJ, FT and El País block article downloads, so they come from public knowledge. The flag was not trusted blindly (it marks elDiario.es, which is free). Unknown: SCMP.
+Outlets whose articles often need a subscription carry `paywall = true` in `feeds.toml` and are shown with a lock. Marked: NYT, WSJ, FT, Haaretz, El País, El Mundo, ABC, Expansión. Checked with the structured data flag `isAccessibleForFree` where the sites allowed it (ABC, El Mundo, Expansión); NYT, WSJ, FT and El País block article downloads, so they come from public knowledge, and so does Haaretz (not checked). The flag was not trusted blindly (it marks elDiario.es, which is free). Unknown: SCMP.
 
 ### Argentina (disabled; verified 2026-10-19)
 
