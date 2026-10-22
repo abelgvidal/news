@@ -20,7 +20,7 @@ exclude_foreign = true  # world news goes to International (URL section, or alre
 # Verified where the sites allowed it (structured data `isAccessibleForFree`), otherwise from public knowledge;
 # NYT, WSJ, FT, The Hindu, El País, El Mundo, ABC and Expansión are marked. Edit freely.
 
-# --- International: foreign outlets only, in English, spread across regions (14 outlets)
+# --- International: foreign outlets only, in English, spread across regions (16 outlets)
 [[feed]]
 name = "The New York Times"
 url = "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"
@@ -105,6 +105,16 @@ country = "int"
 [[feed]]
 name = "Deutsche Welle"
 url = "https://rss.dw.com/xml/rss-en-top"  # the rdf feeds carry no dates we can read
+country = "int"
+
+[[feed]]
+name = "Buenos Aires Times"
+url = "https://www.batimes.com.ar/feed"
+country = "int"
+
+[[feed]]
+name = "Mexico News Daily"
+url = "https://mexiconewsdaily.com/feed/"  # only 10 items per fetch: the hourly fetch keeps them all
 country = "int"
 
 # --- Spain
