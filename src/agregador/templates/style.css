@@ -37,6 +37,7 @@
   .story img { display:block; width:100%; height:auto; aspect-ratio:16/9; object-fit:cover; background:var(--hair); }
   .story figcaption { margin-top:3px; font: 0.68rem system-ui, sans-serif; color:var(--muted); }
   .lead img { aspect-ratio:3/2; }
+  .story figure.small img { aspect-ratio:auto; }  /* small source images: natural size, never upscaled or cropped */
   .story h2 a { color:inherit; text-decoration:none; }
   .story h2 a:hover { color:var(--accent); }
   .flag { font-size:1.35em; line-height:1; vertical-align:-0.12em; margin-right:.2em; font-family:'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif; }
