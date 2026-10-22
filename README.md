@@ -78,7 +78,6 @@ The timers are two systemd units: the hourly `fetch` (a `oneshot` service, `OnCa
 src/agregador/   the pipeline: fetch, normalize, embed, cluster, representative, foreign, countries, render, edition, images
 migrations/      SQLite schema, applied in order
 feeds.toml       editions and outlets
-candidates.toml  outlets waiting to be tested and adopted (scripts/probe_feeds.py checks them)
 scripts/         evaluation and labelling helpers
 tests/           unit tests and the labelled sets
 REQUIREMENTS.md  what it should do, and why

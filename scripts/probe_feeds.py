@@ -1,12 +1,11 @@
 """Probe feeds: does each answer, how many items, how deep (hours), how fresh, what is in it.
 
-    uv run python scripts/probe_feeds.py                      # every entry of candidates.toml
-    uv run python scripts/probe_feeds.py --file feeds.toml    # the feeds in production
-    uv run python scripts/probe_feeds.py --url https://example.com/feed   # a one-off
+    uv run python scripts/probe_feeds.py                      # the feeds in production (feeds.toml)
+    uv run python scripts/probe_feeds.py --url https://example.com/feed   # a one-off, before adding it
     uv run python scripts/probe_feeds.py --only Africanews
 
 Run it from the server too: outlets block datacenter IPs that they do not block at home.
-It only reads; update candidates.toml by hand with what it shows (status, tested, notes).
+It only reads.
 """
 import argparse
 import calendar
@@ -43,7 +42,7 @@ def probe(name: str, url: str, user_agent: str | None = None) -> str:
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--file", type=Path, default=Path(__file__).resolve().parents[1] / "candidates.toml")
+    p.add_argument("--file", type=Path, default=Path(__file__).resolve().parents[1] / "feeds.toml")
     p.add_argument("--url", help="probe one URL instead of a file")
     p.add_argument("--only", help="substring of an outlet's name")
     args = p.parse_args()
@@ -51,7 +50,7 @@ def main() -> None:
         print(probe("(url)", args.url))
         return
     data = tomllib.loads(args.file.read_text(encoding="utf-8"))
-    for entry in data.get("candidate", []) + data.get("feed", []):
+    for entry in data.get("feed", []):
         if args.only and args.only.lower() not in entry["name"].lower():
             continue
         print(probe(entry["name"], entry["url"], entry.get("user_agent")))
