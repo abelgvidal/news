@@ -83,3 +83,8 @@ def test_the_order_is_the_same_in_every_run():
     from agregador.countries import tally
 
     assert list(tally(["Putin, Trump and Xi meet in Beijing"])) == ["Russia", "United States", "China"]
+
+
+def test_new_mexico_is_a_us_state_not_mexico():
+    assert "Mexico" not in tally(["Meta ordered to pay US$25b to New Mexico after jury finds it misled consumers"])
+    assert primary_country(["New Mexico governor signs bill", "New Mexico wildfire spreads"]) == "United States"

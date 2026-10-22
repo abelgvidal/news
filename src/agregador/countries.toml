@@ -32,7 +32,7 @@ people = ["starmer"]
 
 ["United States"]
 iso = "US"
-places = ["united states", "american", "americans", "white house", "pentagon", "congress", "senate", "california", "texas", "new york", "florida", "kansas", "midterms", "washington dc", "wall street", "cnn", "fbi"]
+places = ["united states", "american", "americans", "white house", "pentagon", "congress", "senate", "california", "texas", "new york", "new mexico", "florida", "kansas", "midterms", "washington dc", "wall street", "cnn", "fbi"]
 people = ["trump", "hegseth", "vance", "rubio", "bessent", "biden", "obama"]
 
 [Canada]
