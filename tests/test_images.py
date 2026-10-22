@@ -78,5 +78,5 @@ def test_save_story_image_skips_broken_candidates_and_records_where_it_came_from
     info = save_story_image(_client(handler), cands, "Titular", tmp_path / "img" / "es-01-7.webp")
     assert info["outlet"] == "B" and info["article_url"] == "https://b.example/2"
     assert info["original_url"] == "https://i.example/good.png" and len(info["sha256"]) == 64
-    assert (tmp_path / "img" / "es-01-7.webp").exists()
+    assert info["file"] == f"es-01-7-{info['sha256'][:8]}.webp" and (tmp_path / "img" / info["file"]).exists()
     assert save_story_image(_client(lambda r: httpx.Response(404)), cands, "T", tmp_path / "x.webp") is None

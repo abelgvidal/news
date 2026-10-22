@@ -70,7 +70,7 @@ def build_edition(conn, model: str, now: datetime, countries: list[Country], tz:
                 name = f"{c.code}-{i + 1:02d}-{story.cluster_id}.webp"
                 image = save_story_image(client, list(urls.values()), story.headline, out_dir / day / "img" / name)
                 if image:
-                    image["file"] = f"img/{name}"
+                    image["file"] = f"img/{image['file']}"
             stories.append(_story_json(i + 1, story, image))
         tabs.append({"code": c.code, "name": c.name, "lang": c.lang, "tz": c.tz, "show_flags": c.show_flags,
                      "stories": stories})

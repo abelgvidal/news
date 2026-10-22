@@ -107,7 +107,9 @@ def save_story_image(client: httpx.Client, candidates: list[dict], headline: str
     if best is None:
         return None
     width, webp, height, c = best
+    sha = hashlib.sha256(webp).hexdigest()
+    target = target.with_name(f"{target.stem}-{sha[:8]}{target.suffix}")  # new content, new URL: files are cached forever
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(webp)
-    return {"file": target.name, "width": width, "height": height, "sha256": hashlib.sha256(webp).hexdigest(),
+    return {"file": target.name, "width": width, "height": height, "sha256": sha,
             "original_url": c["url"], "outlet": c["outlet"], "article_url": c["article_url"]}
