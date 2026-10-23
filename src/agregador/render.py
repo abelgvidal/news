@@ -131,10 +131,10 @@ def score(outlets: int, last_published: datetime, now: datetime) -> float:
 def build_stories(
     conn: sqlite3.Connection, model: str, now: datetime, country: str = "es", active_hours: int = ACTIVE_HOURS
 ) -> list[Story]:
-    since = (now - timedelta(hours=active_hours)).isoformat()
+    start = now - timedelta(hours=active_hours)
     clusters = conn.execute(
         "SELECT id, last_published_at FROM cluster "
-        "WHERE model = ? AND country = ? AND last_published_at >= ?", (model, country, since)
+        "WHERE model = ? AND country = ? AND last_published_at >= ?", (model, country, start.isoformat())
     ).fetchall()
     stories = []
     for c in clusters:
@@ -144,6 +144,7 @@ def build_stories(
             "JOIN feed f ON f.id = a.feed_id JOIN embedding e ON e.article_id = a.id AND e.model = ? "
             "WHERE m.cluster_id = ?", (model, c["id"])
         ).fetchall()
+        members = [m for m in members if datetime.fromisoformat(m["published_at"]) >= start]  # not older coverage
         if not members:
             continue
         vecs = np.stack([np.frombuffer(m["vector"], dtype=np.float32) for m in members])
@@ -159,7 +160,7 @@ def build_stories(
             for i in order
         ]
         image = next((_web_url(s["image_url"]) for s in sources if _web_url(s["image_url"])), None)
-        last = datetime.fromisoformat(c["last_published_at"])
+        last = max(published)
         story = Story(
             cluster_id=c["id"], headline=sources[0]["title"], url=_web_url(sources[0]["url"]),
             source=sources[0]["name"], source_paywall=sources[0]["paywall"], image_url=image, updated_at=last,
