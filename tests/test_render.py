@@ -128,6 +128,17 @@ def test_an_article_from_a_neighbouring_topic_is_left_out_of_the_story_and_of_th
     assert "C" not in [o["name"] for o in s.other_outlets]
 
 
+def test_only_the_articles_inside_the_window_make_the_story(tmp_path):
+    conn = _db_with_cluster(tmp_path, [
+        ("A", "Titular viejo", _u(1, 0.0), None, 60 * 30),               # 30 h ago: outside a 24 h edition
+        ("B", "Titular central", _u(1, 0.02), None, 30),
+        ("C", "Titular cercano", _u(1, 0.04), None, 10),
+    ])
+    (s,) = build_stories(conn, "m", NOW, "es", 24)
+    assert s.outlets == 2 and sorted(x["name"] for x in s.sources) == ["B", "C"]
+    assert build_stories(conn, "m", NOW, "es", 48)[0].outlets == 3      # the live preview keeps its 48 h
+
+
 def test_a_quoted_headline_is_not_chosen_when_a_plain_one_is_as_good(tmp_path):
     conn = _db_with_cluster(tmp_path, [
         ("A", 'Feijóo: "No voy a fallar"', _u(1, 0.0), None, 30),
