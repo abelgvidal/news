@@ -4,7 +4,7 @@ import logging
 import re
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 
@@ -151,14 +151,21 @@ def plan_merges(
     return merges
 
 
-def merge_clusters(conn: sqlite3.Connection, model: str, params: Params = Params()) -> int:
-    """Fuse near-identical active clusters of the same country. Returns the number of fusions."""
+def merge_clusters(
+    conn: sqlite3.Connection, model: str, params: Params = Params(), now: datetime | None = None
+) -> int:
+    """Fuse near-identical active clusters of the same country. Returns the number of fusions.
+
+    "Active" counts back from the newest cluster, but never from later than `now`: one article dated in
+    the future would otherwise push the window past every real cluster and switch the merging off.
+    """
     latest = conn.execute(
         "SELECT MAX(last_published_at) FROM cluster WHERE model = ?", (model,)
     ).fetchone()[0]
     if latest is None:
         return 0
-    since = datetime.fromisoformat(latest) - timedelta(hours=params.window_hours)
+    latest = min(datetime.fromisoformat(latest), now or datetime.now(UTC))
+    since = latest - timedelta(hours=params.window_hours)
     active = _load_active(conn, model, since)
     merges = plan_merges(
         list(active.values()), params.merge_threshold, params.merge_small_size, params.merge_big_threshold
