@@ -16,6 +16,7 @@ log = logging.getLogger(__name__)
 
 USER_AGENT = "Mozilla/5.0 (compatible; agregador/0.1; personal news aggregator)"
 TIMEOUT = httpx.Timeout(15.0)
+FUTURE_WARN = timedelta(hours=6)  # clock skew of a feed (Daily Maverick: ~2 h) is normal; days ahead is not
 
 
 @dataclass(frozen=True)
@@ -85,7 +86,8 @@ def fetch_feed(conn: sqlite3.Connection, client: httpx.Client, feed: FeedConfig)
         headers["If-None-Match"] = row["etag"]
     if row["last_modified"]:
         headers["If-Modified-Since"] = row["last_modified"]
-    now = datetime.now(UTC).isoformat()
+    now_dt = datetime.now(UTC)
+    now = now_dt.isoformat()
     try:
         resp = client.get(feed.url, headers=headers)
         if resp.status_code == 304:
@@ -113,12 +115,18 @@ def fetch_feed(conn: sqlite3.Connection, client: httpx.Client, feed: FeedConfig)
     for a in articles:
         if a.published_at < cutoff:  # would be purged right away; don't churn it in and out
             continue
+        published = a.published_at
+        if published > now_dt:  # a feed with a wrong clock or a scheduled piece: never trust a date from the future
+            if published - now_dt > FUTURE_WARN:
+                log.warning("feed %s: %r is dated %s, in the future; stored as fetched now",
+                            feed.name, a.title[:60], published.isoformat())
+            published = now_dt
         cur = conn.execute(
             "INSERT OR IGNORE INTO article "
             "(feed_id, guid, url, title, summary, image_url, published_at, fetched_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (row["id"], a.guid, a.url, a.title, a.summary, a.image_url,
-             a.published_at.isoformat(), now),
+             published.isoformat(), now),
         )
         inserted += cur.rowcount
     conn.execute(

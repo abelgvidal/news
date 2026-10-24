@@ -141,3 +141,26 @@ def test_fusions_cannot_chain_into_one_giant_cluster():
     merges = plan_merges([a, b, c], 0.965, small_size=8, big_threshold=0.985)
     assert len(merges) == 1                      # b goes to one of them, and that is all
     assert {merges[0][0], merges[0][1]} != {1, 3}  # the two big clusters never fuse
+
+
+def test_an_article_dated_in_the_future_does_not_switch_off_the_merging(tmp_path):
+    """Regression: one article dated days ahead made `latest` jump, so no real cluster counted as active."""
+    from datetime import timedelta
+
+    from agregador import db
+    from agregador.cluster import merge_clusters
+
+    now = datetime(2026, 10, 24, 5, 0, tzinfo=UTC)
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    conn.execute("INSERT INTO feed (id, name, url) VALUES (1, 'A', 'a')")
+    last = {1: now - timedelta(hours=10), 2: now - timedelta(hours=9), 3: now + timedelta(days=3)}  # 3: the future one
+    for cid, vec in [(1, unit(1, 0)), (2, unit(1, 0)), (3, unit(0, 1))]:
+        conn.execute(
+            "INSERT INTO cluster (id, model, vector_sum, size, feed_ids, created_at, last_published_at) "
+            "VALUES (?, 'm', ?, 1, '[1]', 'x', ?)", (cid, vec.tobytes(), last[cid].isoformat()))
+        conn.execute(
+            "INSERT INTO article (id, feed_id, url, title, published_at, fetched_at) "
+            "VALUES (?, 1, ?, 't', ?, 'x')", (cid, f"u{cid}", last[cid].isoformat()))
+        conn.execute("INSERT INTO cluster_member (article_id, cluster_id) VALUES (?, ?)", (cid, cid))
+    assert merge_clusters(conn, "m", Params(merge_threshold=0.965), now=now) == 1

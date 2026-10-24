@@ -57,3 +57,50 @@ def test_the_paywall_flag_is_stored_and_updated_from_the_config(tmp_path):
     assert conn.execute("SELECT paywall FROM feed").fetchone()[0] == 1
     fetch_feed(conn, client, FeedConfig("A", "https://a.example/rss", paywall=False))      # edited in feeds.toml
     assert conn.execute("SELECT paywall FROM feed").fetchone()[0] == 0
+
+
+def _rss(pub_date: str) -> bytes:
+    return (
+        '<?xml version="1.0"?><rss version="2.0"><channel><title>t</title>'
+        f"<item><title>Halloween plans</title><link>https://a.example/h</link><guid>h</guid><pubDate>{pub_date}</pubDate></item>"
+        "</channel></rss>"
+    ).encode()
+
+
+def test_an_article_dated_in_the_future_is_stored_with_the_fetch_time(tmp_path):
+    import httpx
+    from datetime import UTC, datetime, timedelta
+    from email.utils import format_datetime
+
+    from agregador.config import FeedConfig
+    from agregador.fetch import fetch_feed
+
+    future = datetime.now(UTC) + timedelta(days=4)
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    client = httpx.Client(transport=httpx.MockTransport(
+        lambda r: httpx.Response(200, content=_rss(format_datetime(future)))))
+    fetch_feed(conn, client, FeedConfig("A", "https://a.example/rss"))
+    row = conn.execute("SELECT published_at, fetched_at FROM article").fetchone()
+    assert row["published_at"] == row["fetched_at"]
+    # seen again later with the same future date: ignored as a duplicate, the stored date does not move
+    fetch_feed(conn, client, FeedConfig("A", "https://a.example/rss"))
+    assert conn.execute("SELECT COUNT(*) FROM article").fetchone()[0] == 1
+    assert conn.execute("SELECT published_at FROM article").fetchone()[0] == row["published_at"]
+
+
+def test_an_article_dated_in_the_past_keeps_its_date(tmp_path):
+    import httpx
+    from datetime import UTC, datetime, timedelta
+    from email.utils import format_datetime
+
+    from agregador.config import FeedConfig
+    from agregador.fetch import fetch_feed
+
+    past = (datetime.now(UTC) - timedelta(hours=5)).replace(microsecond=0)
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    client = httpx.Client(transport=httpx.MockTransport(
+        lambda r: httpx.Response(200, content=_rss(format_datetime(past)))))
+    fetch_feed(conn, client, FeedConfig("A", "https://a.example/rss"))
+    assert conn.execute("SELECT published_at FROM article").fetchone()[0] == past.isoformat()
