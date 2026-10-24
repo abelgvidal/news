@@ -33,15 +33,15 @@ Needs `.vault_pass` in that directory. Propose the command and wait for my appro
 ## Reviews
 When I ask to review an edition ("revisa la edición"), read `https://news.lpsz.org/<date>/edition.json` and the server DB (read-only). Check: fronts with a duplicate story, off-topic articles inside a story, International stories with fewer than 4 outlets, and whether the merge pass ran (`merged from cluster` notes in `cluster_member`). Judge it as a product owner and propose small steps. Count duplicates only from the 2026-10-25 edition: before that the merge was switched off by a future-dated article.
 
-Before changing the clustering or thinking about a bigger model, compare models offline on my laptop, never on production. The thresholds in `cluster.py` are tuned for `multilingual-e5-small`, so a new model also needs them re-tuned:
+The embedding model stays `multilingual-e5-small`. On 2026-10-24 I compared `multilingual-e5-base` offline and it gave no gain (same quality on the labelled sets, 3.4x slower, 2.4x the memory), so do not propose a bigger model for same-language headlines. Reopen it only if the goal changes (e.g. clustering across languages) or the reviewed label set grows a lot. If so, compare on my laptop, never on production, and re-tune the thresholds in `cluster.py` (they are tuned for the small model):
 
 ```bash
-uv run python scripts/tune.py --certain intfloat/multilingual-e5-small intfloat/multilingual-e5-base
-uv run python scripts/eval_clusters.py --certain intfloat/multilingual-e5-base --file tests/labeled_clusters_int.csv
-uv run python scripts/eval_clusters.py --certain intfloat/multilingual-e5-base --file tests/labeled_clusters.csv
+uv run python scripts/tune.py --certain intfloat/multilingual-e5-small <candidate-model>
+uv run python scripts/eval_clusters.py --certain <candidate-model> --file tests/labeled_clusters_int.csv
+uv run python scripts/eval_clusters.py --certain <candidate-model> --file tests/labeled_clusters.csv
 ```
 
-Compare against the small's baseline. The labels are a first pass by a model, so a result is only a hint until I review them. A larger model must also fit the edition's memory cap in `13-agregador.yml` (base needs about 1.1 GB, large about 2.2 GB).
+The labels are a first pass by a model, so a result is only a hint until I review them. A candidate must also fit the edition's memory cap in `13-agregador.yml` (1.5 GB).
 
 ## Commits
 Written in English, in the style of `git log`: one imperative line saying what changed, then a short paragraph with the why when it isn't obvious. Commit or push only when I ask.
