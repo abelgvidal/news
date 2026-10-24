@@ -30,6 +30,19 @@ Needs `.vault_pass` in that directory. Propose the command and wait for my appro
 - No AI-generated text in the pages. Every headline is shown as published and links to the outlet. There is no generative model in the pipeline; the only model is the embedding model `multilingual-e5-small`.
 - Changes to clustering are measured against the labelled sets in `tests/` and `scripts/` before being accepted.
 
+## Reviews
+When I ask to review an edition ("revisa la edición"), read `https://news.lpsz.org/<date>/edition.json` and the server DB (read-only). Check: fronts with a duplicate story, off-topic articles inside a story, International stories with fewer than 4 outlets, and whether the merge pass ran (`merged from cluster` notes in `cluster_member`). Judge it as a product owner and propose small steps. Count duplicates only from the 2026-10-25 edition: before that the merge was switched off by a future-dated article.
+
+Before changing the clustering or thinking about a bigger model, compare models offline on my laptop, never on production. The thresholds in `cluster.py` are tuned for `multilingual-e5-small`, so a new model also needs them re-tuned:
+
+```bash
+uv run python scripts/tune.py --certain intfloat/multilingual-e5-small intfloat/multilingual-e5-base
+uv run python scripts/eval_clusters.py --certain intfloat/multilingual-e5-base --file tests/labeled_clusters_int.csv
+uv run python scripts/eval_clusters.py --certain intfloat/multilingual-e5-base --file tests/labeled_clusters.csv
+```
+
+Compare against the small's baseline. The labels are a first pass by a model, so a result is only a hint until I review them. A larger model must also fit the edition's memory cap in `13-agregador.yml` (base needs about 1.1 GB, large about 2.2 GB).
+
 ## Commits
 Written in English, in the style of `git log`: one imperative line saying what changed, then a short paragraph with the why when it isn't obvious. Commit or push only when I ask.
 
