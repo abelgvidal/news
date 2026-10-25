@@ -161,8 +161,8 @@ EN = Country("int", "International", "Europe/Madrid", "en")
 def test_an_english_page_has_english_labels_dates_and_title():
     es = Country("es", "Spain", "Europe/Madrid", "es")
     html = render_page([story(1, 7, 1)], NOW, EN, [EN, es])
-    assert '<html lang="en">' in html and "<title>News Aggregator · International</title>" in html
-    assert "<h1>News Aggregator</h1>" in html
+    assert '<html lang="en">' in html and "<title>The Daily Ten · International</title>" in html
+    assert "<h1>The Daily Ten</h1>" in html
     assert "Monday, 19 October 2026" in html and "Most covered in the press" in html
     assert "and 6 more" in html and "Also in" not in html
     assert ">International</a>" in html and ">Spain</a>" in html            # tabs in English
@@ -170,7 +170,7 @@ def test_an_english_page_has_english_labels_dates_and_title():
 
 def test_a_spanish_page_keeps_spanish_labels_but_the_english_title():
     html = render_page([story(1, 7, 1)], NOW)
-    assert "<h1>News Aggregator</h1>" in html and "lunes, 19 de octubre de 2026" in html
+    assert "<h1>The Daily Ten</h1>" in html and "lunes, 19 de octubre de 2026" in html
     assert "y 6 más" in html and "También en" not in html
 
 
