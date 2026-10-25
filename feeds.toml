@@ -108,13 +108,8 @@ url = "https://rss.dw.com/xml/rss-en-top"  # the rdf feeds carry no dates we can
 country = "int"
 
 [[feed]]
-name = "Buenos Aires Times"
-url = "https://www.batimes.com.ar/feed"
-country = "int"
-
-[[feed]]
-name = "Mexico News Daily"
-url = "https://mexiconewsdaily.com/feed/"  # only 10 items per fetch: the hourly fetch keeps them all
+name = "Dawn"
+url = "https://www.dawn.com/feeds/world"
 country = "int"
 
 # --- Spain
