@@ -76,7 +76,8 @@ def centrality(vectors: np.ndarray) -> np.ndarray:
 
 
 def title_words(title: str) -> set[str]:
-    folded = unicodedata.normalize("NFKD", title.lower()).encode("ascii", "ignore").decode()
+    unpossessed = re.sub(r"['’]s\b", "", title.lower())  # "Brazil’s" must match "Brazil", not become "brazils"
+    folded = unicodedata.normalize("NFKD", unpossessed).encode("ascii", "ignore").decode()
     return {w for w in re.findall(r"[a-z0-9]{4,}", folded) if w not in _STOP}
 
 
