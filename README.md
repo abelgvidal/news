@@ -10,7 +10,7 @@ It does not write anything. Every headline you see was written by a journalist, 
 - **Groups the same story across outlets** with a small embedding model that runs on a CPU. No API, no key, no invoice.
 - **Ranks by how many distinct outlets cover it**, with a half-life of 24 hours, so yesterday's scandal eventually has to leave.
 - **Shows the real headline** of the most representative article. No summaries. No "AI-powered insights". No friendly paragraph explaining what you just read.
-- **Two editions.** *International* (16 outlets, in English, untranslated) and *Spain* (17 outlets, in Spanish). Spanish world news is kept out of the Spain tab, because the International tab already has it and one of each is enough.
+- **Two editions.** *International* (15 outlets, in English, untranslated) and *Spain* (17 outlets, in Spanish). Spanish world news is kept out of the Spain tab, because the International tab already has it and one of each is enough.
 - **One story per country** in International. Otherwise it would be a daily report on the United States.
 - **Padlocks** on outlets that tend to want your credit card.
 - **Archive.** One frozen edition per day, with previous/next links. Yesterday's front page stays yesterday's front page.
