@@ -25,26 +25,12 @@
   {%- if o.paywall %} <span class="lock" title="{{ L.paywall }}" aria-label="{{ L.paywall }}">🔒</span>{% endif -%}
 {%- endmacro %}
 
-{% macro story(s, kicker=true, img=true) %}
+{% macro story(s, img=true) %}
   <article class="story{% if img and s.image %} has-img{% endif %}">
     {% if img and s.image %}<figure{% if s.image.width < 560 %} class="small" style="max-width:{{ s.image.width }}px"{% endif %}><img src="{{ assets }}{{ s.image.file }}" alt="{{ s.headline }}" width="{{ s.image.width }}" height="{{ s.image.height }}" loading="lazy"><figcaption title="{{ L.image }}: {{ s.image.outlet }}">{{ L.image }}: {{ s.image.outlet }}</figcaption></figure>{% endif %}
-    {% if kicker %}<div class="kicker">{% if country.show_flags %}<span class="flag" title="{{ s.involved | join(', ') or L.no_country }}" aria-label="{{ s.involved | join(', ') or L.no_country }}">{{ s.flags }}</span> {% endif %}{{ s.outlets }} {{ L.outlets }} · {{ hora(s.updated_at) }}</div>{% endif %}
     <h2>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ s.headline }}</a>{% else %}{{ s.headline }}{% endif %}</h2>
-    <p class="source">{{ s.source }}{% if s.source_paywall %} <span class="lock" title="{{ L.paywall }}" aria-label="{{ L.paywall }}">🔒</span>{% endif %}</p>
     {% set links = s.other_outlets %}
-    {% if links %}
-    <div class="outlets{% if links | length > 2 %} many{% endif %}">
-      <div class="outlets-full"><b>{{ L.also_in }}</b>
-        {% for o in links[:4] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}
-        {% if links | length > 4 %}
-        <details class="more"><summary>{{ L.more.format(n=links | length - 4) }}</summary>{% for o in links[4:] %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</details>
-        {% endif %}
-      </div>
-      {% if links | length > 2 %}
-      <details class="outlets-compact"><summary>{{ L.also_in }} {{ links | length }} {{ L.outlets }}</summary>{% for o in links %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</details>
-      {% endif %}
-    </div>
-    {% endif %}
+    <details class="byline"><summary><span class="source">{{ s.source }}{% if s.source_paywall %} <span class="lock" title="{{ L.paywall }}" aria-label="{{ L.paywall }}">🔒</span>{% endif %}</span> <span class="more">{{ L.more.format(n=links | length) }}</span></summary><div class="outlets">{% for o in links %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</div></details>
   </article>
 {% endmacro %}
 

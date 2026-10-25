@@ -33,7 +33,7 @@ def test_the_headline_is_shown_as_published_linked_to_its_article_with_its_outle
     html = render_page([story(1, 3, 1, headline='Feijóo: "No voy a fallar" & más')], NOW)
     assert 'href="https://e.com/1/0"' in html and 'rel="noopener noreferrer nofollow"' in html
     assert "Feijóo: &#34;No voy a fallar&#34; &amp; más" in html        # untouched, only escaped
-    assert '<p class="source">M0</p>' in html
+    assert '<span class="source">M0</span> <span class="more">y 2 más</span>' in html
 
 
 def test_html_in_a_headline_is_escaped():
@@ -41,19 +41,14 @@ def test_html_in_a_headline_is_escaped():
     assert "&lt;b&gt;" in html and "Titular <b>" not in html
 
 
-def test_other_outlets_exclude_the_representatives_and_fold_after_four():
+def test_other_outlets_exclude_the_representative_and_sit_behind_one_toggle():
     s = story(1, 7, 1)                       # M0 is the representative; M1..M6 are the others
     assert [o["name"] for o in s.other_outlets] == ["M1", "M2", "M3", "M4", "M5", "M6"]
     html = render_page([s], NOW)
-    assert html.count('<details class="more"') == 1 and "y 2 más" in html
-    shown, folded = html[:html.index("<details")], html[html.index("<details"):]
-    assert all(f'href="https://e.com/1/{i}"' in shown for i in (1, 2, 3, 4))
-    assert all(f'href="https://e.com/1/{i}"' in folded for i in (5, 6))
+    assert html.count('<details class="byline"') == 1 and "y 6 más" in html
+    shown, listed = html[:html.index("<details")], html[html.index('<div class="outlets">'):]
     assert 'href="https://e.com/1/0"' in shown                          # the headline itself
-
-
-def test_few_outlets_need_no_toggle():
-    assert '<details class="more"' not in render_page([story(1, 3, 1)], NOW)
+    assert all(f'href="https://e.com/1/{i}"' in listed for i in range(1, 7))   # every other outlet stays linked
 
 
 def test_only_http_urls_become_links_and_unsafe_ones_are_dropped():
@@ -169,20 +164,20 @@ def test_an_english_page_has_english_labels_dates_and_title():
     assert '<html lang="en">' in html and "<title>News Aggregator · International</title>" in html
     assert "<h1>News Aggregator</h1>" in html
     assert "Monday, 19 October 2026" in html and "Most covered in the press" in html
-    assert "7 outlets" in html and "<b>Also in</b>" in html and "and 2 more" in html
+    assert "and 6 more" in html and "Also in" not in html
     assert ">International</a>" in html and ">Spain</a>" in html            # tabs in English
 
 
 def test_a_spanish_page_keeps_spanish_labels_but_the_english_title():
     html = render_page([story(1, 7, 1)], NOW)
     assert "<h1>News Aggregator</h1>" in html and "lunes, 19 de octubre de 2026" in html
-    assert "7 medios" in html and "<b>También en</b>" in html and "y 2 más" in html
+    assert "y 6 más" in html and "También en" not in html
 
 
 def test_paywalled_outlets_get_a_lock_where_they_are_named_and_others_do_not():
     s = story(1, 4, 1, paywalled={"M0", "M2"})
     html = render_page([s], NOW, EN)
-    assert html.count("🔒") == 3        # the source label, and M2 in "Also in" (the full list and the phone's folded one)
+    assert html.count("🔒") == 2        # the source label, and M2 in the list behind "and 2 more"
     assert 'title="May require a subscription"' in html
     assert s.other_outlets[1]["paywall"] is True and s.other_outlets[0]["paywall"] is False
 
@@ -263,15 +258,10 @@ def test_the_cap_and_the_exclusion_work_together():
 
 # --- flags ----------------------------------------------------------------------------------------
 
-def test_an_edition_with_flags_shows_the_flags_of_the_countries_involved_and_a_globe_for_none():
+def test_the_page_shows_no_flag_and_no_count_and_time_line_even_if_the_edition_asks_for_flags():
     flags_on = Country("int", "International", "Europe/Madrid", "en", show_flags=True)
-    france = _about(1, 5, "France imposes curfews in Paris")
-    summit = _about(2, 4, "Putin floats a summit with Trump and Xi to discuss Ukraine deal")
-    none = _about(3, 3, "Possible wreckage of Amelia Earhart's plane likely to be trees")
-    html = render_page([france, summit, none], NOW, flags_on)
-    assert '<span class="flag" title="France" aria-label="France">🇫🇷</span>' in html
-    assert 'title="Ukraine, Russia, United States, China"' in html and "🇺🇦🇷🇺🇺🇸🇨🇳" in html   # heaviest first, ties by appearance
-    assert 'title="No country identified"' in html and "🌐" in html
+    html = render_page([story(1, 7, 1)], NOW, flags_on)
+    assert 'class="flag"' not in html and "kicker" not in html and "7 outlets" not in html
 
 
 def test_an_edition_without_flags_shows_none():
