@@ -267,3 +267,17 @@ def test_the_page_shows_no_flag_and_no_count_and_time_line_even_if_the_edition_a
 def test_an_edition_without_flags_shows_none():
     html = render_page([_about(1, 5, "France imposes curfews in Paris")], NOW, Country("es", "Spain", "Europe/Madrid", "es"))
     assert 'class="flag"' not in html and "🇫🇷" not in html
+
+
+def test_an_unusually_long_headline_is_replaced_but_the_story_and_its_outlet_count_do_not_change(tmp_path):
+    conn = _db_with_cluster(tmp_path, [
+        ("A", "Detenido un sospechoso tras el incendio del refugio de montaña en Baviera por una presunta negligencia grave", _u(1, 0.02), None, 50),
+        ("B", "Detenido un sospechoso tras el incendio del refugio", _u(1, 0.0), None, 40),
+        ("C", "Incendio del refugio: detenido un sospechoso", _u(1, 0.05), None, 30),
+        ("D", "Detienen a un sospechoso por el incendio del refugio", _u(1, 0.08), None, 20),
+        ("E", "Un detenido por el incendio en el refugio", _u(1, -0.03), None, 10),
+    ])
+    (s,) = build_stories(conn, "m", NOW, "es")
+    assert (s.headline, s.source) == ("Detenido un sospechoso tras el incendio del refugio", "B")
+    assert s.outlets == 5 and abs(s.sources[0]["similarity"] - 1.0) < 1e-6
+    assert "A" in [o["name"] for o in s.other_outlets] and "B" not in [o["name"] for o in s.other_outlets]

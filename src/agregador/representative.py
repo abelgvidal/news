@@ -9,7 +9,9 @@ best: applied to everything it pushed the choice to tangential articles, or out 
 clusters. Ties go to the article published first. Counts and links use the core.
 """
 import re
+import statistics
 import unicodedata
+from collections import Counter
 from datetime import datetime
 
 import numpy as np
@@ -19,6 +21,13 @@ import numpy as np
 PENALTY_WEIGHT = 0.03
 NEAR_CENTER = 0.02  # penalties only separate articles within this much centrality of the most central one
 MAX_HEADLINE_CHARS = 110
+
+# The headline shown is the representative's, unless it is unusually long for its own story: then a shorter headline of
+# the same core that keeps all the key terms takes its place (the core, the outlet count and the ranking do not change).
+# Checked on the six editions published 2026-10-20..25: 1.35 swaps 2 of 120 stories; 1.25 also cut a death toll.
+LONG_HEADLINE_RATIO = 1.35  # against the median length of the core's headlines
+MIN_CORE_FOR_SWAP = 4  # a median of two or three headlines says nothing about what is long
+KEY_TERM_SHARE = 0.4  # a key term appears in at least this share of the core's headlines (and in two or more)
 
 # Membership of the core: similarity to the representative + WORD_WEIGHT * headline word overlap >= MEMBER_THRESHOLD.
 # Tuned on tests/labeled_clusters.csv, labeled with a strict "same specific news item" criterion (scripts/eval_clusters.py):
@@ -110,3 +119,33 @@ def choose_story(titles: list[str], vectors: np.ndarray, published: list[datetim
     else:
         rep = medoid
     return rep, core_members(titles, vectors, rep)
+
+
+def _terms(title: str) -> set[str]:
+    """Content words plus every number: a death toll or an amount is part of what a headline says."""
+    folded = unicodedata.normalize("NFKD", title.lower()).encode("ascii", "ignore").decode()
+    return title_words(title) | set(re.findall(r"\d+", folded))
+
+
+def headline_to_show(titles: list[str], core: list[int], rep: int) -> int:
+    """The article whose headline is shown: `rep`, unless that headline is far longer than the story's usual one.
+
+    Then it is the headline of the core, closest to the median length, that has no front-page penalties, is
+    shorter, and contains every key term (words and numbers most of the core's headlines share) the long one does.
+    """
+    if len(core) < MIN_CORE_FOR_SWAP:
+        return rep
+    lengths = {i: len(titles[i]) for i in core}
+    median = statistics.median(lengths.values())
+    if lengths[rep] < LONG_HEADLINE_RATIO * median:
+        return rep
+    terms = {i: _terms(titles[i]) for i in core}
+    counts = Counter(t for ts in terms.values() for t in ts)
+    key = {t for t, n in counts.items() if n >= max(2, KEY_TERM_SHARE * len(core))}
+
+    def coverage(i: int) -> float:
+        return len(key & terms[i]) / len(key) if key else 1.0
+
+    shorter = [i for i in core if lengths[i] < lengths[rep] and headline_penalties(titles[i]) == 0
+               and coverage(i) >= coverage(rep)]
+    return min(shorter, key=lambda i: abs(lengths[i] - median)) if shorter else rep

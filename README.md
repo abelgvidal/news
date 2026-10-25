@@ -20,7 +20,7 @@ It does not write anything. Every headline you see was written by a journalist, 
 1. Each article is embedded (`intfloat/multilingual-e5-small`) and joined to the nearest cluster above a similarity threshold, or starts its own.
 2. Small clusters that are really the same thing get merged. Big ones need much stronger evidence, because two big stories merging is how you get a headline about everything.
 3. Inside a cluster, the medoid fixes *which* story it is. Articles that drifted into a neighbouring topic are dropped from the story and from the outlet count.
-4. The representative headline is the most central one in that core, with small penalties for quotes, question marks, live blogs and headlines that are mostly capitals. Tie-breaker only. Clickbait is not banned, merely discouraged.
+4. The representative headline is the most central one in that core, with small penalties for quotes, question marks, live blogs and headlines that are mostly capitals. Tie-breaker only. Clickbait is not banned, merely discouraged. A headline far longer than its story's usual one is swapped for a shorter headline of the same story that keeps its key terms and figures; the story and its outlet count do not change.
 
 There is no generative model anywhere in the pipeline. The only machine learning is the embedding model, which turns text into numbers and has never had an opinion.
 

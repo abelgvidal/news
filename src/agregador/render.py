@@ -15,7 +15,7 @@ from jinja2 import Environment, PackageLoader, select_autoescape
 from .config import Country
 from .countries import flag, involved_countries, primary_country
 from .foreign import centroid, entity_stems, judge
-from .representative import choose_story
+from .representative import choose_story, headline_to_show
 
 ACTIVE_HOURS = 48
 HALF_LIFE_HOURS = 24
@@ -150,7 +150,8 @@ def build_stories(
         vecs = np.stack([np.frombuffer(m["vector"], dtype=np.float32) for m in members])
         published = [datetime.fromisoformat(m["published_at"]) for m in members]
         titles = [m["title"] for m in members]
-        best, core = choose_story(titles, vecs, published)  # the cluster may hold neighbouring topics: keep the story
+        rep, core = choose_story(titles, vecs, published)  # the cluster may hold neighbouring topics: keep the story
+        best = headline_to_show(titles, core, rep)  # same story and outlet count, a headline that is not an outlier
         sims = vecs @ vecs[best]
         order = sorted(core, key=lambda i: (i != best, -float(sims[i])))
         sources = [
