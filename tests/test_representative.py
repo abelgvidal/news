@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from agregador.representative import (
-    centrality, choose_story, core_members, headline_penalties, title_overlap,
+    centrality, choose_story, core_members, headline_penalties, title_overlap, title_words,
 )
 
 T0 = datetime(2026, 10, 19, 10, 0, tzinfo=UTC)
@@ -87,6 +87,13 @@ def test_a_penalty_never_pushes_the_choice_to_a_clearly_less_central_article():
 def test_title_overlap_counts_shared_content_words_only():
     assert title_overlap("Feijóo firma su contrato con España", "El contrato de Feijóo con España") > 0.4
     assert title_overlap("La dana deja cuatro muertos", "Meloni envía 500 militares a Milán") == 0.0
+
+
+def test_an_english_possessive_does_not_hide_a_shared_word():
+    """Regression: "Brazil’s" became "brazils", so it shared nothing with "Brazil" and a borderline outlet fell out of the core."""
+    assert title_words("Brazil’s Lula") == title_words("Brazil Lula") == {"brazil", "lula"}
+    assert title_words("The company's board") == {"company", "board"}
+    assert title_overlap("Brazil’s Lula debates", "Brazil candidates debate") > 0.0
 
 
 def test_core_keeps_the_story_and_drops_neighbouring_topics():
