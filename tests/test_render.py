@@ -269,6 +269,38 @@ def test_an_edition_without_flags_shows_none():
     assert 'class="flag"' not in html and "🇫🇷" not in html
 
 
+# --- coverage line --------------------------------------------------------------------------------
+
+def _in(cid, outlets, hours_ago, *countries):
+    s = story(cid, outlets, hours_ago)
+    s.fixed_involved = list(countries)
+    return s
+
+
+def test_the_coverage_line_names_the_main_country_of_each_story_most_covered_first_without_repeats():
+    stories = [_in(1, 3, 1, "Iran", "Israel"), _in(2, 9, 1, "Brazil"), _in(3, 5, 1, "Iran"), _in(4, 4, 1)]
+    html = render_page(stories, NOW, Country("int", "International", "Europe/Madrid", "en", show_flags=True))
+    assert "Today we cover Brazil and Iran." in html
+
+
+def test_the_coverage_line_names_every_country_without_a_cap_or_a_count():
+    stories = [_in(i, 20 - i, 1, f"Country{i}") for i in range(1, 9)]
+    html = render_page(stories, NOW, Country("int", "International", "Europe/Madrid", "en", show_flags=True))
+    assert "Country1, Country2, Country3, Country4, Country5, Country6, Country7 and Country8." in html
+    assert "more" not in html.split('<p class="coverage">')[1].split("</p>")[0]
+
+
+def test_a_country_name_never_breaks_across_lines_in_the_coverage_line():
+    html = render_page([_in(1, 5, 1, "United States")], NOW, Country("int", "I", "Europe/Madrid", "en", show_flags=True))
+    assert "United States." in html
+
+
+def test_no_coverage_line_when_the_edition_does_not_ask_for_it_or_no_story_names_a_country():
+    stories = [_in(1, 5, 1, "France")]
+    assert "Today we cover" not in render_page(stories, NOW, Country("es", "Spain", "Europe/Madrid", "es"))
+    assert "Today we cover" not in render_page([_in(1, 5, 1)], NOW, Country("int", "I", "Europe/Madrid", "en", show_flags=True))
+
+
 def test_an_unusually_long_headline_is_replaced_but_the_story_and_its_outlet_count_do_not_change(tmp_path):
     conn = _db_with_cluster(tmp_path, [
         ("A", "Detenido un sospechoso tras el incendio del refugio de montaña en Baviera por una presunta negligencia grave", _u(1, 0.02), None, 50),

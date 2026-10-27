@@ -44,13 +44,13 @@ LABELS = {
            "empty": "Todavía no hay noticias agrupadas.", "no_country": "Sin país identificado",
            "edition": "Lo más citado en los medios · edición de las", "image": "Imagen", "archive": "Archivo",
            "prev": "Anterior", "next": "Siguiente", "latest": "Última edición",
-           "none": "Todavía no hay ediciones."},
+           "none": "Todavía no hay ediciones.", "cover": "Hoy cubrimos", "and": "y"},
     "en": {"site": "The Daily Ten", "outlets": "outlets", "also_in": "Also in", "more": "and {n} more",
            "dateline": "Most covered in the press · updated at", "paywall": "May require a subscription",
            "empty": "No grouped stories yet.", "no_country": "No country identified",
            "edition": "Most covered in the press · edition of", "image": "Image", "archive": "Archive",
            "prev": "Previous", "next": "Next", "latest": "Latest edition",
-           "none": "No editions yet."},
+           "none": "No editions yet.", "cover": "Today we cover", "and": "and"},
 }
 
 
@@ -178,6 +178,23 @@ def ranked(stories: list[Story]) -> list[Story]:
     return sorted((s for s in stories if s.outlets > 1), key=lambda s: s.score, reverse=True)
 
 
+def coverage_line(stories: list[Story], L: dict) -> str:
+    """"Israel, Brazil and Iran": the main country of each story, in the stories' order, all of them.
+
+    Only the heaviest country of a story counts (the others are mostly actors, or noise from the
+    headlines), so the order is the popularity of the stories. Empty when no story names a country.
+    A name keeps its words together (no break inside "United States"); the page puts "Today we cover" before.
+    """
+    names: list[str] = []
+    for story in stories:
+        if story.involved and story.involved[0] not in names:
+            names.append(story.involved[0])
+    names = [n.replace(" ", " ") for n in names]
+    if len(names) > 1:
+        return f"{', '.join(names[:-1])} {L['and']} {names[-1]}."
+    return f"{names[0]}." if names else ""
+
+
 def top_stories(stories: list[Story], exclude=None, max_per_country: int = 0) -> list[Story]:
     """The front page: the most covered stories, skipping those `exclude(story)` rejects.
 
@@ -239,10 +256,13 @@ def render_page(
 ) -> str:
     """One page. `edition` ({assets, prev, next, archive}: hrefs from this page) marks a published edition."""
     countries = countries or [country]
+    front = top_stories(stories)
+    labels = LABELS[country.lang]
     return _env.get_template("index.html").render(
-        stories=top_stories(stories), now=now, country=country, root=root, edition=edition,
+        stories=front, now=now, country=country, root=root, edition=edition,
+        coverage=coverage_line(front, labels) if country.show_flags else "",
         assets=edition["assets"] if edition else "",
-        nav=_nav(countries, country, root), L=LABELS[country.lang],
+        nav=_nav(countries, country, root), L=labels,
         fecha=(fecha_en if country.lang == "en" else fecha_es)(now, country.tz),
         hora=lambda dt: hora_local(dt, country.tz),
     )

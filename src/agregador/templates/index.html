@@ -19,6 +19,7 @@
 {% else %}
 <div class="dateline"><span>{{ fecha }}</span><span>{{ L.dateline }} {{ hora(now) }}</span></div>
 {% endif %}
+{% if coverage %}<p class="coverage">{{ L.cover }} {{ coverage }}</p>{% endif %}
 
 {% macro outlet(o) -%}
   {%- if o.url %}<a href="{{ o.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ o.name }}</a>{% else %}{{ o.name }}{% endif -%}
