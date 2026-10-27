@@ -14,7 +14,7 @@
   .tabs a[aria-current="page"] { color:var(--fg); border-bottom-color:var(--accent); }
   .dateline { display:flex; justify-content:space-between; gap:12px; font: 0.78rem system-ui, sans-serif; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
               border-bottom:1px solid var(--rule); padding:7px 0; margin-bottom:18px; }
-
+  .coverage { margin:-8px 0 18px; font: 0.85rem/1.4 system-ui, sans-serif; color:var(--muted); }
   /* Grid */
   .top { display:grid; grid-template-columns: 2fr 1fr; gap:0; }
   .row3 { display:grid; grid-template-columns: repeat(3, 1fr); border-top:1px solid var(--rule); margin-top:18px; }
@@ -69,6 +69,7 @@
     .row3 .col + .col, .row4 .col + .col { border-top:1px solid var(--hair); }
     .row4 .col:nth-child(3) { padding-left:0; }
     .dateline { flex-direction:column; gap:2px; text-align:center; }
+    .coverage { text-align:center; }
   }
   .dateline a { color:inherit; text-decoration:none; }
   .dateline a:hover { color:var(--accent); }
