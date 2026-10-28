@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 
 from . import db
-from .config import load_countries, load_feeds
+from .config import FeedConfig, load_countries, load_feeds
 from .cluster import Params, cluster_pending, reset_clusters
 from .edition import make_edition, refresh_site
 from .embed import DEFAULT_MODEL, embed_pending
@@ -54,10 +54,11 @@ def main() -> None:
         new = fetch_all(conn, load_feeds(args.feeds))
         print(f"{new} new articles")
     elif args.command == "health":
-        for r in conn.execute(
-            "SELECT name, last_success_at, consecutive_failures, last_error FROM feed ORDER BY name"
-        ):
+        rows, retired = feed_health(conn, load_feeds(args.feeds))
+        for r in rows:
             print(f"{r['name']:<20} ok={r['last_success_at']} fails={r['consecutive_failures']} {r['last_error'] or ''}")
+        if retired:
+            print(f"({retired} feed rows no longer in {args.feeds} ignored)")
     elif args.command == "render":
         for path in write_site(conn, DEFAULT_MODEL, args.out, load_countries(args.feeds)):
             print(path)
@@ -88,6 +89,20 @@ def main() -> None:
         show_clusters(conn, args.top)
     elif args.command == "explain":
         explain(conn, args.article_id)
+
+
+def feed_health(conn, feeds: list[FeedConfig]) -> tuple[list, int]:
+    """Health rows of the feeds in the config, and how many rows of retired feeds were left out.
+
+    A feed dropped from feeds.toml keeps its row (and its failure count) in the database; showing it would
+    be a false alarm, since nothing fetches it any more.
+    """
+    urls = {f.url for f in feeds}
+    rows = conn.execute(
+        "SELECT name, url, last_success_at, consecutive_failures, last_error FROM feed ORDER BY name"
+    ).fetchall()
+    current = [r for r in rows if r["url"] in urls]
+    return current, len(rows) - len(current)
 
 
 def show_clusters(conn, top: int) -> None:
