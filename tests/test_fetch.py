@@ -104,3 +104,18 @@ def test_an_article_dated_in_the_past_keeps_its_date(tmp_path):
         lambda r: httpx.Response(200, content=_rss(format_datetime(past)))))
     fetch_feed(conn, client, FeedConfig("A", "https://a.example/rss"))
     assert conn.execute("SELECT published_at FROM article").fetchone()[0] == past.isoformat()
+
+
+def test_feed_health_ignores_feeds_dropped_from_the_config(tmp_path):
+    from agregador.cli import feed_health
+    from agregador.config import FeedConfig
+
+    conn = db.connect(tmp_path / "t.db")
+    db.migrate(conn)
+    for name, url, fails in [("Kept", "https://a.example/rss", 0), ("Retired", "https://b.example/rss", 49)]:
+        conn.execute("INSERT INTO feed (name, url, consecutive_failures) VALUES (?, ?, ?)", (name, url, fails))
+
+    rows, retired = feed_health(conn, [FeedConfig(name="Kept", url="https://a.example/rss")])
+
+    assert [r["name"] for r in rows] == ["Kept"]
+    assert retired == 1
