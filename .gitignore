@@ -5,3 +5,4 @@ data/
 site/
 .pytest_cache/
 TASKS.org
+CLAUDE.local.md
