@@ -78,6 +78,17 @@ def test_refresh_site_rebuilds_pages_from_the_manifest_alone(tmp_path):
     assert page.exists() and (site / "index.html").exists() and len(load_editions(site)) == 1
 
 
+def test_the_fonts_are_copied_to_the_site_and_every_page_finds_them_from_its_own_depth(tmp_path):
+    site = tmp_path / "site"
+    make_edition(_conn(tmp_path), "m", [INT, ES], site, "Europe/Madrid", now=NOW, images=False)
+    assert (site / "fonts" / "barlow-condensed-latin-800.woff2").exists() and (site / "fonts" / "OFL.txt").exists()
+    font = "fonts/barlow-condensed-latin-800.woff2"
+    assert f"url({font})" in (site / "index.html").read_text()                              # home
+    assert f"url(../{font})" in (site / "2026-10-19" / "index.html").read_text()            # an edition
+    assert f"url(../../{font})" in (site / "2026-10-19" / "es" / "index.html").read_text()  # its second tab
+    assert f"url(../{font})" in (site / "archive" / "index.html").read_text()
+
+
 def test_images_are_referenced_relative_to_each_page(tmp_path):
     site = tmp_path / "site"
     make_edition(_conn(tmp_path), "m", [INT, ES], site, "Europe/Madrid", now=NOW, images=False)

@@ -261,7 +261,24 @@ def test_the_cap_and_the_exclusion_work_together():
 def test_the_page_shows_no_flag_and_no_count_and_time_line_even_if_the_edition_asks_for_flags():
     flags_on = Country("int", "International", "Europe/Madrid", "en", show_flags=True)
     html = render_page([story(1, 7, 1)], NOW, flags_on)
-    assert 'class="flag"' not in html and "kicker" not in html and "7 outlets" not in html
+    assert 'class="flag"' not in html and "7 outlets" not in html and "🇫🇷" not in html
+
+
+# --- numbering and the font ------------------------------------------------------------------------
+
+def test_every_story_shows_its_place_on_the_page_from_1_to_10_and_no_outlet_count():
+    stories = [story(i, 12 - i, 1) for i in range(1, 11)]       # 11..2 outlets
+    html = render_page(stories, NOW, EN)
+    for rank in range(1, 11):
+        assert f'<span class="badge"><b>{rank}</b></span>' in html
+    assert "11 outlets" not in html and 'class="badge"><b>11</b>' not in html      # the count lives behind "and N more"
+    assert "and 10 more" in html
+
+
+def test_the_page_loads_its_font_relative_to_the_site_root():
+    assert "url(fonts/barlow-condensed-latin-800.woff2)" in render_page([story(1, 3, 1)], NOW)
+    sub = render_page([story(1, 3, 1)], NOW, EN, [EN, Country("es", "Spain", "Europe/Madrid", "es")], root="../")
+    assert "url(../fonts/barlow-condensed-latin-800.woff2)" in sub and 'href="../fonts/barlow-condensed-latin-800.woff2"' in sub
 
 
 def test_an_edition_without_flags_shows_none():

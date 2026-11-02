@@ -17,7 +17,8 @@ import httpx
 from .config import Country
 from .fetch import USER_AGENT
 from .images import save_story_image
-from .render import (LABELS, Story, _DAYS_EN, _MONTHS_EN, _env, _web_url, _write_atomic, front_pages, render_page)
+from .render import (LABELS, Story, _DAYS_EN, _MONTHS_EN, _env, _web_url, _write_atomic, copy_static, front_pages,
+                     render_page)
 
 log = logging.getLogger(__name__)
 
@@ -128,7 +129,7 @@ def _tab_page(edition: dict, index: int, neighbours: dict, latest: bool) -> tupl
 
     links = {"assets": f"{up}{edition['date']}/" if latest else ("" if first else "../"),
              "prev": href(neighbours["prev"]), "next": href(neighbours["next"]) if not latest else None,
-             "archive": f"{up}archive/index.html"}
+             "archive": f"{up}archive/index.html", "site_root": up}
     html = render_page([_story(j) for j in tab["stories"]], datetime.fromisoformat(edition["generated_at"]),
                        countries[index], countries, root="" if first else "../", edition=links)
     where = Path(sub) if latest else Path(edition["date"]) / sub
@@ -143,7 +144,7 @@ def _archive_page(editions: list[dict]) -> str:
             "date": e["date"], "label": f"{_DAYS_EN[d.weekday()]} {d.day}",
             "tabs": [{"code": t["code"], "name": t["name"]} for t in e["tabs"]]})
     return _env.get_template("archive.html").render(
-        L=LABELS["en"], root="../", months=[{"name": n, "days": days} for n, days in months.items()])
+        L=LABELS["en"], root="../", site_root="../", months=[{"name": n, "days": days} for n, days in months.items()])
 
 
 def refresh_site(out_dir: Path) -> None:
@@ -164,3 +165,4 @@ def refresh_site(out_dir: Path) -> None:
                 path, html = _tab_page(e, t, neighbours, latest=True)
                 _write_atomic(out_dir / path, html)
     _write_atomic(out_dir / "archive" / "index.html", _archive_page(editions))
+    copy_static(out_dir)

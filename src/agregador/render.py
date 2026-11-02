@@ -1,6 +1,7 @@
 """Render the front page as static HTML: each story is a cluster's most representative real headline."""
 import math
 import os
+import shutil
 from collections import Counter
 import sqlite3
 from dataclasses import dataclass
@@ -28,6 +29,12 @@ _MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agos
            "septiembre", "octubre", "noviembre", "diciembre"]
 
 _env = Environment(loader=PackageLoader("agregador"), autoescape=select_autoescape())
+STATIC = Path(__file__).parent / "static"  # files the pages load by URL (the fonts), copied next to the pages
+
+
+def copy_static(out_dir: Path) -> None:
+    """Put the fonts in `<site>/fonts/`, where every page finds them relative to the site root."""
+    shutil.copytree(STATIC, out_dir, dirs_exist_ok=True)
 
 
 def fecha_es(dt: datetime, tz: str) -> str:
@@ -262,6 +269,7 @@ def render_page(
         stories=front, now=now, country=country, root=root, edition=edition,
         coverage=coverage_line(front, labels) if country.show_flags else "",
         assets=edition["assets"] if edition else "",
+        site_root=edition["site_root"] if edition else root,  # from this page to the site root (fonts live there)
         nav=_nav(countries, country, root), L=labels,
         fecha=(fecha_en if country.lang == "en" else fecha_es)(now, country.tz),
         hora=lambda dt: hora_local(dt, country.tz),
@@ -291,4 +299,5 @@ def write_site(
         target = out_dir / "index.html" if home else out_dir / country.code / "index.html"
         _write_atomic(target, html)
         paths.append(target)
+    copy_static(out_dir)
     return paths

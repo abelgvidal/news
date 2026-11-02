@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ L.site }} · {{ country.name }}</title>
+<link rel="preload" href="{{ site_root }}fonts/barlow-condensed-latin-800.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 {% include "style.css" %}
 </style>
@@ -26,9 +27,11 @@
   {%- if o.paywall %} <span class="lock" title="{{ L.paywall }}" aria-label="{{ L.paywall }}">🔒</span>{% endif -%}
 {%- endmacro %}
 
-{% macro story(s, img=true) %}
+{# the badge is the story's place on the page (1 to 10) #}
+{% macro story(s, rank, img=true) %}
   <article class="story{% if img and s.image %} has-img{% endif %}">
     {% if img and s.image %}<figure{% if s.image.width < 560 %} class="small" style="max-width:{{ s.image.width }}px"{% endif %}><img src="{{ assets }}{{ s.image.file }}" alt="{{ s.headline }}" width="{{ s.image.width }}" height="{{ s.image.height }}" loading="lazy"><figcaption title="{{ L.image }}: {{ s.image.outlet }}">{{ L.image }}: {{ s.image.outlet }}</figcaption></figure>{% endif %}
+    <p class="kicker"><span class="badge"><b>{{ rank }}</b></span></p>
     <h2>{% if s.url %}<a href="{{ s.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ s.headline }}</a>{% else %}{{ s.headline }}{% endif %}</h2>
     {% set links = s.other_outlets %}
     <details class="byline"><summary><span class="source">{{ s.source }}{% if s.source_paywall %} <span class="lock" title="{{ L.paywall }}" aria-label="{{ L.paywall }}">🔒</span>{% endif %}</span> <span class="more">{{ L.more.format(n=links | length) }}</span></summary><div class="outlets">{% for o in links %}{{ outlet(o) }}{% if not loop.last %}, {% endif %}{% endfor %}</div></details>
@@ -38,14 +41,14 @@
 {% if stories %}
 <main>
   <section class="top">
-    <div class="lead">{{ story(stories[0]) }}</div>
-    <div class="side">{% for s in stories[1:3] %}{{ story(s, img=(loop.first)) }}{% endfor %}</div>
+    <div class="lead">{{ story(stories[0], 1) }}</div>
+    <div class="side">{% for s in stories[1:3] %}{{ story(s, loop.index + 1, img=(loop.first)) }}{% endfor %}</div>
   </section>
   {% if stories[3:6] %}
-  <section class="row3">{% for s in stories[3:6] %}<div class="col">{{ story(s) }}</div>{% endfor %}</section>
+  <section class="row3">{% for s in stories[3:6] %}<div class="col">{{ story(s, loop.index + 3) }}</div>{% endfor %}</section>
   {% endif %}
   {% if stories[6:] %}
-  <section class="row4">{% for s in stories[6:] %}<div class="col">{{ story(s, img=false) }}</div>{% endfor %}</section>
+  <section class="row4">{% for s in stories[6:] %}<div class="col">{{ story(s, loop.index + 6, img=false) }}</div>{% endfor %}</section>
   {% endif %}
 </main>
 {% else %}
